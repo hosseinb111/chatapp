@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Chat App</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {}
+            }
+        }
+    </script>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 min-h-screen flex items-center justify-center">
+    <!-- Username Section -->
+    <div id="username-section" class="w-full max-w-md bg-white dark:bg-gray-800 p-8 rounded-lg shadow-md">
+        <h2 class="text-2xl font-bold mb-6 text-center">Chat App</h2>
+        <input id="username-input" type="text" placeholder="Enter your username" class="w-full mb-4 p-2 border rounded dark:bg-gray-700 dark:border-gray-600">
+        <button id="set-username-btn" class="w-full py-2 bg-blue-500 text-white rounded">Continue</button>
+        <p id="username-error" class="text-red-500 mt-4 text-center"></p>
+    </div>
+    
+    <!-- Friend Selection Section (shown after setting username) -->
+    <div id="friend-section" class="hidden w-full max-w-md bg-white dark:bg-gray-800 p-8 rounded-lg shadow-md">
+        <h2 class="text-2xl font-bold mb-6 text-center">Start Chat</h2>
+        <input id="friend-username" type="text" placeholder="Friend's Username" class="w-full mb-4 p-2 border rounded dark:bg-gray-700 dark:border-gray-600">
+        <button id="start-chat-btn" class="w-full py-2 bg-blue-500 text-white rounded">Start Chat</button>
+        <p id="friend-error" class="text-red-500 mt-4 text-center"></p>
+    </div>
+    
+    <!-- Chat Section (hidden initially) -->
+    <div id="chat-section" class="hidden flex flex-col h-screen w-full max-w-4xl mx-auto bg-white dark:bg-gray-800 shadow-md">
+        <!-- Header -->
+        <div class="p-4 bg-blue-500 text-white flex justify-between items-center">
+            <span>Chatting with <span id="friend-display"></span></span>
+            <div>
+                <button id="dark-mode-toggle" class="mr-4">Toggle Dark Mode</button>
+                <button id="logout-btn">Logout</button>
+            </div>
+        </div>
+        
+        <!-- Messages Area -->
+        <div id="messages" class="flex-1 overflow-y-auto p-4 space-y-4">
+            <!-- Messages will be appended here -->
+        </div>
+        
+        <!-- Input Area -->
+        <div class="p-4 bg-gray-100 dark:bg-gray-700 flex">
+            <input id="message-input" type="text" placeholder="Type a message..." class="flex-1 p-2 border rounded-l dark:bg-gray-800 dark:border-gray-600">
+            <button id="send-btn" class="py-2 px-4 bg-blue-500 text-white rounded-r">Send</button>
+        </div>
+        
+        <p id="chat-error" class="text-red-500 p-4 text-center"></p>
+    </div>
+
+    <script>
+        // Supabase Configuration
+        // Replace with your own if different.
+        // Create tables in Supabase:
+        // - profiles: id (uuid, primary key, default uuid_generate_v4()), username (text, unique)
+        // - messages: id (uuid, primary key, default uuid_generate_v4()), sender_id (uuid, references profiles(id)), receiver_id (uuid, references profiles(id)), message_text (text), created_at (timestamptz, default now())
+        // IMPORTANT: For this version without authentication, disable all RLS policies on 'profiles' and 'messages' tables in Supabase dashboard. This makes the database public, which is not secure for production use.
+        
+        const supabaseUrl = 'https://fzjkpppzwiuozvszbbdl.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ6amtwcHB6d2l1b3p2c3piYmRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYzODEwOTAsImV4cCI6MjA3MTk1NzA5MH0.32p6IZZYDIhd1RtPX8NgOv-kPjI-YBl5wCX5ajNnarg';
+        const supabase = Supabase.createClient(supabaseUrl, supabaseKey);
+        
+        let currentUser = null; // {id: uuid}
+        let currentUsername = null;
+        let friendId = null;
+        let friendUsername = null;
+        let subscription = null;
+        
+        // Check for existing user in localStorage on load
+        function checkLocalStorage() {
+            const storedId = localStorage.getItem('userId');
+            const storedUsername = localStorage.getItem('username');
+            if (storedId && storedUsername) {
+                currentUser = { id: storedId };
+                currentUsername = storedUsername;
+                showFriendSection();
+            }
+        }
+        checkLocalStorage();
+        
+        // Set Username Function
+        document.getElementById('set-username-btn').addEventListener('click', async () => {
+            const username = document.getElementById('username-input').value.trim();
+            if (!username) {
+                showUsernameError('Username is required.');
+                return;
+            }
+            // Check if username exists
+            let { data: profile, error: selectError } = await supabase.from('profiles').select('id').eq('username', username).single();
+            if (selectError && selectError.code !== 'PGRST116') { // PGRST116 is no rows
+                showUsernameError(selectError.message);
+                return;
+            }
+            let userId;
+            if (profile) {
+                userId = profile.id;
+            } else {
+                // Create new profile
+                const { data: newProfile, error: insertError } = await supabase.from('profiles').insert({ username }).select('id');
+                if (insertError) {
+                    showUsernameError(insertError.message);
+                    return;
+                }
+                userId = newProfile[0].id;
+            }
+            currentUser = { id: userId };
+            currentUsername = username;
+            localStorage.setItem('userId', userId);
+            localStorage.setItem('username', username);
+            showFriendSection();
+        });
+        
+        // Start Chat Function
+        document.getElementById('start-chat-btn').addEventListener('click', async () => {
+            friendUsername = document.getElementById('friend-username').value.trim();
+            if (!friendUsername) {
+                showFriendError('Friend username is required.');
+                return;
+            }
+            if (friendUsername === currentUsername) {
+                showFriendError('Cannot chat with yourself.');
+                return;
+            }
+            const { data, error } = await supabase.from('profiles').select('id').eq('username', friendUsername).single();
+            if (error || !data) {
+                showFriendError('User not found.');
+                return;
+            }
+            friendId = data.id;
+            document.getElementById('friend-display').textContent = friendUsername;
+            showChatSection();
+            loadMessages();
+            subscribeToMessages();
+        });
+        
+        // Send Message Function
+        document.getElementById('send-btn').addEventListener('click', sendMessage);
+        document.getElementById('message-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendMessage();
+        });
+        
+        async function sendMessage() {
+            const text = document.getElementById('message-input').value.trim();
+            if (!text) return;
+            const { error } = await supabase.from('messages').insert({
+                sender_id: currentUser.id,
+                receiver_id: friendId,
+                message_text: text
+            });
+            if (error) {
+                showChatError(error.message);
+                return;
+            }
+            document.getElementById('message-input').value = '';
+        }
+        
+        // Load Messages Function
+        async function loadMessages() {
+            const messagesDiv = document.getElementById('messages');
+            messagesDiv.innerHTML = '<div class="text-center">Loading...</div>';
+            const me = currentUser.id;
+            const friend = friendId;
+            const { data, error } = await supabase.from('messages')
+                .select('*')
+                .or(`and(sender_id.eq.${me},receiver_id.eq.${friend}),and(sender_id.eq.${friend},receiver_id.eq.${me})`)
+                .order('created_at', { ascending: true });
+            if (error) {
+                showChatError(error.message);
+                return;
+            }
+            messagesDiv.innerHTML = '';
+            data.forEach(appendMessage);
+            scrollToBottom();
+        }
+        
+        // Subscribe to Real-time Messages
+        function subscribeToMessages() {
+            if (subscription) subscription.unsubscribe();
+            subscription = supabase.channel('messages-channel')
+                .on('postgres_changes', {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'messages'
+                }, (payload) => {
+                    const msg = payload.new;
+                    if (
+                        (msg.sender_id === currentUser.id && msg.receiver_id === friendId) ||
+                        (msg.sender_id === friendId && msg.receiver_id === currentUser.id)
+                    ) {
+                        appendMessage(msg);
+                        scrollToBottom();
+                    }
+                })
+                .subscribe();
+        }
+        
+        // Append Message to UI
+        function appendMessage(msg) {
+            const messagesDiv = document.getElementById('messages');
+            const isSent = msg.sender_id === currentUser.id;
+            const bubbleClass = isSent ? 'ml-auto bg-blue-500 text-white' : 'mr-auto bg-gray-300 dark:bg-gray-600 text-gray-900 dark:text-gray-100';
+            const time = new Date(msg.created_at).toLocaleTimeString();
+            const messageElement = document.createElement('div');
+            messageElement.classList.add('max-w-xs', 'p-3', 'rounded-lg', bubbleClass);
+            messageElement.innerHTML = `
+                <p>${msg.message_text}</p>
+                <p class="text-xs mt-1 opacity-75">${time}</p>
+            `;
+            messagesDiv.appendChild(messageElement);
+        }
+        
+        // Scroll to Bottom
+        function scrollToBottom() {
+            const messagesDiv = document.getElementById('messages');
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+        
+        // Logout Function (clears local storage)
+        document.getElementById('logout-btn').addEventListener('click', async () => {
+            localStorage.removeItem('userId');
+            localStorage.removeItem('username');
+            currentUser = null;
+            currentUsername = null;
+            friendId = null;
+            friendUsername = null;
+            if (subscription) subscription.unsubscribe();
+            showUsernameSection();
+        });
+        
+        // Dark Mode Toggle
+        document.getElementById('dark-mode-toggle').addEventListener('click', () => {
+            document.documentElement.classList.toggle('dark');
+        });
+        
+        // Show/Hide Sections
+        function showUsernameSection() {
+            document.getElementById('username-section').classList.remove('hidden');
+            document.getElementById('friend-section').classList.add('hidden');
+            document.getElementById('chat-section').classList.add('hidden');
+        }
+        
+        function showFriendSection() {
+            document.getElementById('username-section').classList.add('hidden');
+            document.getElementById('friend-section').classList.remove('hidden');
+            document.getElementById('chat-section').classList.add('hidden');
+        }
+        
+        function showChatSection() {
+            document.getElementById('username-section').classList.add('hidden');
+            document.getElementById('friend-section').classList.add('hidden');
+            document.getElementById('chat-section').classList.remove('hidden');
+        }
+        
+        // Error Handlers
+        function showUsernameError(msg) {
+            document.getElementById('username-error').textContent = msg;
+        }
+        
+        function showFriendError(msg) {
+            document.getElementById('friend-error').textContent = msg;
+        }
+        
+        function showChatError(msg) {
+            document.getElementById('chat-error').textContent = msg;
+        }
+    </script>
+</body>
+</html>
