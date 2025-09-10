@@ -1,179 +1,961 @@
-<!DOCTYPE html>
-<html lang="en">
+<!doctype html>
+<html lang="en" data-theme="light">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chat App</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <style>
-        /* Custom scrollbar for chat area */
-        .custom-scrollbar::-webkit-scrollbar {
-            width: 6px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-track {
-            background: #f1f1f1;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-            background: #888;
-            border-radius: 3px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-            background: #555;
-        }
-    </style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Free & Complicated Messenger 😉✌️</title>
+  <meta name="color-scheme" content="light dark" />
+
+  <!--
+    =======================
+    Supabase setup (read me)
+    =======================
+
+    Using your provided client code (kept exactly as requested).
+    We add an import map so the browser can resolve @supabase/supabase-js to the CDN (v2).
+
+    1) SQL — create the table and enable Realtime:
+
+      -- Run this in Supabase SQL editor
+      create table if not exists public.messages (
+        id bigint primary key generated always as identity,
+        username text not null,
+        text text not null,
+        created_at timestamp with time zone not null default now(),
+        reply_to bigint references public.messages(id) on delete set null,
+        reactions jsonb not null default '{"👍":[],"👎":[]}'
+      );
+
+      -- Enable Realtime:
+      -- Dashboard > Database > Replication > Realtime
+      -- Enable for schema 'public'
+      -- Then toggle table 'messages' to "On"
+
+    2) RLS — demo-only (insecure). Allow all operations for anon:
+      alter table public.messages enable row level security;
+
+      create policy "read_all" on public.messages
+        for select using (true);
+
+      create policy "insert_all" on public.messages
+        for insert with check (true);
+
+      create policy "update_all" on public.messages
+        for update using (true);
+
+      create policy "delete_all" on public.messages
+        for delete using (true);
+
+    3) Serve this file (e.g., VSCode Live Server) and chat away 🚀
+  -->
+
+  <!-- Import map to resolve @supabase/supabase-js to the v2 CDN ESM build -->
+  <script type="importmap">
+  {
+    "imports": {
+      "@supabase/supabase-js": "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm"
+    }
+  }
+  </script>
+
+  <style>
+    :root {
+      --bg: #f7f7fb;
+      --card-bg: #ffffff;
+      --text: #111827;
+      --muted: #6b7280;
+      --accent: #6366f1;
+      --accent-weak: #ecebff;
+      --bubble-in: #e9ecff;
+      --bubble-out: #f3f4f6;
+      --border: #e5e7eb;
+      --shadow: 0 10px 30px rgb(0 0 0 / 0.08);
+      --radius: 16px;
+      --radius-sm: 12px;
+      --radius-xs: 10px;
+
+      --btn-bg: #f9fafb;
+      --btn-hover-bg: #eef2ff;
+      --btn-border: #e5e7eb;
+
+      --success: #10b981;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root { color-scheme: dark; }
+      html[data-theme="system"] {
+        --bg: #0b1020;
+        --card-bg: #0f172a;
+        --text: #e5e7eb;
+        --muted: #93a4b8;
+        --accent: #8b5cf6;
+        --accent-weak: #1e1b4b;
+        --bubble-in: #1f2a44;
+        --bubble-out: #101826;
+        --border: #1f2937;
+        --shadow: 0 10px 30px rgb(0 0 0 / 0.35);
+        --btn-bg: #0b1220;
+        --btn-hover-bg: #182037;
+        --btn-border: #1f2937;
+      }
+    }
+    html[data-theme="dark"] {
+      --bg: #0b1020;
+      --card-bg: #0f172a;
+      --text: #e5e7eb;
+      --muted: #93a4b8;
+      --accent: #8b5cf6;
+      --accent-weak: #1e1b4b;
+      --bubble-in: #1f2a44;
+      --bubble-out: #101826;
+      --border: #1f2937;
+      --shadow: 0 10px 30px rgb(0 0 0 / 0.35);
+      --btn-bg: #0b1220;
+      --btn-hover-bg: #182037;
+      --btn-border: #1f2937;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      line-height: 1.35;
+      display: flex;
+      flex-direction: column;
+    }
+
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    .container {
+      width: 100%;
+      max-width: 1000px;
+      padding: 16px;
+      margin: 0 auto;
+    }
+
+    header.app-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 16px 0 8px;
+    }
+    .title-wrap {
+      display: grid;
+      gap: 2px;
+    }
+    .title {
+      font-size: clamp(18px, 2.4vw, 26px);
+      font-weight: 800;
+      letter-spacing: 0.2px;
+    }
+    .subtitle {
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .theme-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 12px;
+      border-radius: 999px;
+      border: 1px solid var(--btn-border);
+      background: var(--btn-bg);
+      color: var(--text);
+      cursor: pointer;
+      transition: background 0.15s ease, border-color 0.15s ease, transform 0.04s ease;
+      user-select: none;
+    }
+    .theme-toggle:hover { background: var(--btn-hover-bg); }
+    .theme-toggle:active { transform: translateY(1px); }
+    .theme-toggle .icon { font-size: 16px; }
+    .theme-toggle .label { font-size: 13px; color: var(--muted); }
+
+    .app-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      display: flex;
+      flex-direction: column;
+      height: min(80vh, 820px);
+      overflow: clip;
+    }
+
+    .chat-scroll {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+      scroll-behavior: smooth;
+      background: linear-gradient(180deg, transparent, transparent 75%, color-mix(in srgb, var(--card-bg) 90%, var(--bg) 10%));
+    }
+
+    /* Nice scrollbar */
+    .chat-scroll::-webkit-scrollbar { width: 10px; }
+    .chat-scroll::-webkit-scrollbar-thumb {
+      background: color-mix(in srgb, var(--muted) 30%, transparent);
+      border-radius: 999px;
+      border: 3px solid transparent;
+      background-clip: content-box;
+    }
+
+    ul#messages {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 12px;
+    }
+
+    .message {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      align-items: start;
+      gap: 10px;
+      opacity: 0;
+      transform: translateY(8px);
+      animation: in 260ms ease forwards;
+    }
+    .message.from-me { grid-template-columns: 1fr auto; }
+    @keyframes in {
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      font-weight: 700;
+      color: white;
+      user-select: none;
+      box-shadow: 0 2px 10px rgb(0 0 0 / 0.18);
+    }
+
+    .bubble {
+      max-width: min(700px, 80vw);
+      padding: 10px 12px;
+      background: var(--bubble-out);
+      border-radius: 12px 12px 12px 6px;
+      border: 1px solid color-mix(in srgb, var(--border) 85%, transparent);
+      position: relative;
+    }
+    .from-me .bubble {
+      background: var(--bubble-in);
+      border-radius: 12px 12px 6px 12px;
+    }
+
+    .meta {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 4px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .name { font-weight: 700; color: color-mix(in srgb, var(--text) 80%, var(--muted) 20%); }
+    .time { font-variant-numeric: tabular-nums; opacity: 0.8; }
+
+    .reply-preview {
+      margin: 6px 0 8px;
+      padding: 8px 10px;
+      border-left: 3px solid var(--accent);
+      border-radius: 8px;
+      background: color-mix(in srgb, var(--accent-weak) 45%, transparent);
+      color: color-mix(in srgb, var(--muted) 84%, var(--text) 16%);
+      font-size: 12px;
+      cursor: pointer;
+      transition: background 0.15s ease, border-color 0.15s ease;
+    }
+    .reply-preview:hover { background: color-mix(in srgb, var(--accent-weak) 65%, transparent); }
+    .reply-preview .rp-author { font-weight: 700; color: color-mix(in srgb, var(--text) 70%, var(--muted) 30%); }
+
+    .text {
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      line-height: 1.45;
+      font-size: 14px;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 8px;
+      user-select: none;
+    }
+    .actions button {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      font-size: 12px;
+      color: var(--muted);
+      background: transparent;
+      border: 1px solid var(--btn-border);
+      border-radius: var(--radius-xs);
+      cursor: pointer;
+      transition: background 0.15s ease, border-color 0.15s ease, transform 0.04s ease;
+    }
+    .actions button:hover { background: var(--btn-hover-bg); }
+    .actions button:active { transform: translateY(1px); }
+    .actions .danger:hover { border-color: color-mix(in srgb, var(--danger) 50%, var(--btn-border)); color: var(--danger); }
+    .actions .reaction.active {
+      background: color-mix(in srgb, var(--accent) 16%, transparent);
+      color: color-mix(in srgb, var(--accent) 70%, var(--text) 30%);
+      border-color: color-mix(in srgb, var(--accent) 30%, var(--btn-border));
+    }
+    .count {
+      font-variant-numeric: tabular-nums;
+      opacity: 0.9;
+    }
+
+    .edit-area {
+      margin-top: 8px;
+      display: grid;
+      gap: 8px;
+    }
+    .edit-area textarea {
+      width: 100%;
+      min-height: 60px;
+      max-height: 220px;
+      resize: vertical;
+      padding: 8px 10px;
+      border-radius: var(--radius-xs);
+      color: var(--text);
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      outline: none;
+      font: inherit;
+    }
+    .edit-area .row {
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      border-radius: 10px;
+      border: 1px solid var(--btn-border);
+      background: var(--btn-bg);
+      color: var(--text);
+      cursor: pointer;
+      transition: background 0.15s ease, border-color 0.15s ease;
+    }
+    .btn:hover { background: var(--btn-hover-bg); }
+    .btn.primary {
+      background: var(--accent);
+      border-color: color-mix(in srgb, var(--accent) 80%, var(--btn-border));
+      color: white;
+    }
+    .btn.primary:disabled { opacity: 0.6; cursor: not-allowed; }
+    .btn.ghost {
+      background: transparent;
+    }
+
+    .composer {
+      border-top: 1px solid var(--border);
+      background: color-mix(in srgb, var(--card-bg) 80%, var(--bg) 20%);
+      padding: 12px;
+      display: grid;
+      gap: 10px;
+    }
+    .reply-bar {
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      background: color-mix(in srgb, var(--accent-weak) 50%, transparent);
+      border: 1px dashed color-mix(in srgb, var(--accent) 40%, var(--border) 60%);
+      color: color-mix(in srgb, var(--muted) 75%, var(--text) 25%);
+      border-radius: var(--radius-sm);
+      padding: 8px 10px;
+    }
+    .reply-bar.visible { display: flex; }
+    .reply-bar strong { color: color-mix(in srgb, var(--text) 80%, var(--muted) 20%); }
+    .reply-dismiss {
+      border: 0;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      padding: 6px 8px;
+      border-radius: 8px;
+    }
+    .reply-dismiss:hover { background: var(--btn-hover-bg); }
+
+    .composer-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      align-items: end;
+    }
+    .input-wrap {
+      position: relative;
+      display: grid;
+    }
+    textarea#composer-input {
+      width: 100%;
+      min-height: 48px;
+      max-height: 200px;
+      padding: 12px 14px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      outline: none;
+      color: var(--text);
+      background: var(--card-bg);
+      resize: vertical;
+      font: inherit;
+    }
+    textarea#composer-input:focus {
+      border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+    }
+
+    footer.app-footer {
+      text-align: center;
+      color: var(--muted);
+      font-size: 13px;
+      padding: 14px 0 24px;
+    }
+
+    .highlight {
+      animation: glow 1200ms ease 1;
+    }
+    @keyframes glow {
+      0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 30%, transparent); }
+      100% { box-shadow: 0 0 0 0 transparent; }
+    }
+
+    .sr-only {
+      position: absolute !important;
+      height: 1px; width: 1px;
+      overflow: hidden; clip: rect(1px, 1px, 1px, 1px);
+      white-space: nowrap; border: 0; padding: 0; margin: -1px;
+    }
+
+    @media (max-width: 640px) {
+      .bubble { max-width: 100%; }
+      .composer { padding: 10px; }
+      .actions button { padding: 6px 8px; }
+    }
+  </style>
 </head>
-<body class="bg-gray-100 dark:bg-gray-900 h-screen overflow-hidden">
-    <!-- Main Container -->
-    <div class="flex h-full">
-        <!-- Sidebar (Optional - can be hidden for single chat) -->
-        <div id="sidebar" class="w-80 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col">
-            <!-- User Info -->
-            <div class="p-4 border-b border-gray-200 dark:border-gray-700">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <h2 class="font-semibold text-gray-800 dark:text-gray-200">Chat App</h2>
-                        <p id="userEmail" class="text-sm text-gray-600 dark:text-gray-400">Not logged in</p>
-                    </div>
-                    <button id="darkModeToggle" class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
-                        <svg class="w-5 h-5 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
-                        </svg>
-                    </button>
-                </div>
-            </div>
-            
-            <!-- Chat List -->
-            <div class="flex-1 overflow-y-auto">
-                <div class="p-4">
-                    <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Active Chats</h3>
-                    <div id="chatList" class="space-y-2">
-                        <!-- Chat items will be populated here -->
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Auth Section -->
-            <div class="p-4 border-t border-gray-200 dark:border-gray-700">
-                <div id="authSection">
-                    <button id="loginBtn" class="w-full bg-blue-500 text-white rounded-lg px-4 py-2 hover:bg-blue-600 transition">
-                        Login
-                    </button>
-                </div>
-                <div id="loggedInSection" class="hidden">
-                    <button id="logoutBtn" class="w-full bg-red-500 text-white rounded-lg px-4 py-2 hover:bg-red-600 transition">
-                        Logout
-                    </button>
-                </div>
-            </div>
+<body>
+  <div class="container">
+    <header class="app-header">
+      <div class="title-wrap">
+        <div class="title">Free & Complicated Messenger 😉✌️</div>
+        <div class="subtitle">Realtime chat with replies, edits, reactions — powered by Supabase</div>
+      </div>
+      <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Toggle theme">
+        <span class="icon" id="theme-icon">🌙</span>
+        <span class="label" id="theme-label">Dark</span>
+      </button>
+    </header>
+
+    <main class="app-card" role="main" aria-live="polite">
+      <section id="chat" class="chat-scroll">
+        <ul id="messages" aria-label="Messages"></ul>
+      </section>
+
+      <section class="composer" aria-label="Message composer">
+        <div id="reply-bar" class="reply-bar" role="note">
+          <div>
+            Replying to <strong id="reply-author">Someone</strong> — <span id="reply-snippet">...</span>
+          </div>
+          <button id="reply-cancel" class="reply-dismiss" type="button" title="Cancel reply">✖</button>
         </div>
 
-        <!-- Main Chat Area -->
-        <div class="flex-1 flex flex-col bg-white dark:bg-gray-800">
-            <!-- Chat Header -->
-            <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <h1 class="text-xl font-semibold text-gray-800 dark:text-gray-200">Chat Room</h1>
-                        <p id="chatStatus" class="text-sm text-gray-600 dark:text-gray-400">Select a chat or start messaging</p>
-                    </div>
-                    <button id="toggleSidebar" class="md:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
-                        <svg class="w-6 h-6 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
-                        </svg>
-                    </button>
-                </div>
-            </div>
-
-            <!-- Messages Area -->
-            <div id="messagesContainer" class="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
-                <div id="loadingState" class="flex items-center justify-center h-full">
-                    <div class="text-gray-500 dark:text-gray-400">
-                        <svg class="animate-spin h-8 w-8 mx-auto mb-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        <p>Loading messages...</p>
-                    </div>
-                </div>
-                <div id="messagesArea" class="hidden">
-                    <!-- Messages will be populated here -->
-                </div>
-            </div>
-
-            <!-- Message Input Area -->
-            <div class="border-t border-gray-200 dark:border-gray-700 px-4 py-4">
-                <form id="messageForm" class="flex gap-2">
-                    <input
-                        type="text"
-                        id="messageInput"
-                        placeholder="Type a message..."
-                        class="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-gray-200"
-                        disabled
-                    />
-                    <button
-                        type="submit"
-                        id="sendButton"
-                        class="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                        disabled
-                    >
-                        Send
-                    </button>
-                </form>
-            </div>
+        <div class="composer-row">
+          <div class="input-wrap">
+            <label for="composer-input" class="sr-only">Type your message</label>
+            <textarea id="composer-input" placeholder="Type a message. Press Enter to send (Shift+Enter for a newline)"></textarea>
+          </div>
+          <button id="send-btn" class="btn primary" type="button" disabled>Send ➤</button>
         </div>
-    </div>
+      </section>
+    </main>
 
-    <!-- Login Modal -->
-    <div id="loginModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
-        <div class="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md">
-            <h2 class="text-2xl font-bold mb-4 text-gray-800 dark:text-gray-200">Login</h2>
-            <form id="loginForm" class="space-y-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email</label>
-                    <input
-                        type="email"
-                        id="loginEmail"
-                        required
-                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-gray-200"
-                    />
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Password</label>
-                    <input
-                        type="password"
-                        id="loginPassword"
-                        required
-                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-gray-200"
-                    />
-                </div>
-                <div id="loginError" class="text-red-500 text-sm hidden"></div>
-                <div class="flex gap-2">
-                    <button
-                        type="submit"
-                        class="flex-1 bg-blue-500 text-white rounded-lg px-4 py-2 hover:bg-blue-600 transition"
-                    >
-                        Login
-                    </button>
-                    <button
-                        type="button"
-                        id="signupToggle"
-                        class="flex-1 bg-green-500 text-white rounded-lg px-4 py-2 hover:bg-green-600 transition"
-                    >
-                        Sign Up
-                    </button>
-                </div>
-                <button
-                    type="button"
-                    id="closeModal"
-                    class="w-full text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
-                >
-                    Cancel
-                </button>
-            </form>
+    <footer class="app-footer">made with ❤️☕️</footer>
+  </div>
+
+  <script type="module">
+    import { createClient } from '@supabase/supabase-js'
+
+    const supabaseUrl = 'https://fzjkpppzwiuozvszbbdl.supabase.co'
+    const supabaseKey = 'sb_publishable_ClRXbub_U_y3zA3E9oFdUg_vyzDiPtN'  // public anon key
+    const supabase = createClient(supabaseUrl, supabaseKey)
+
+    // ==========
+    // State
+    // ==========
+    const messagesEl = document.getElementById('messages');
+    const chatScroll = document.getElementById('chat');
+    const inputEl = document.getElementById('composer-input');
+    const sendBtn = document.getElementById('send-btn');
+    const replyBar = document.getElementById('reply-bar');
+    const replyAuthorEl = document.getElementById('reply-author');
+    const replySnippetEl = document.getElementById('reply-snippet');
+    const replyCancelBtn = document.getElementById('reply-cancel');
+    const themeToggleBtn = document.getElementById('theme-toggle');
+    const themeIconEl = document.getElementById('theme-icon');
+    const themeLabelEl = document.getElementById('theme-label');
+
+    const MSG_TABLE = 'messages';
+    const THEME_KEY = 'fcm_theme';
+    const USER_KEY = 'fcm_username';
+
+    let currentUser = null;
+    let replyTarget = null; // { id, username, text }
+    const messageCache = new Map(); // id -> row
+    const elementCache = new Map(); // id -> li
+
+    // ==========
+    // Utilities
+    // ==========
+    function escapeHTML(str = '') {
+      return str
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+    }
+
+    function formatTime(d) {
+      const date = (d instanceof Date) ? d : new Date(d);
+      return date.toLocaleString([], { hour: '2-digit', minute: '2-digit' });
+    }
+
+    function fullTime(d) {
+      const date = (d instanceof Date) ? d : new Date(d);
+      return date.toLocaleString();
+    }
+
+    function initials(name = '') {
+      const parts = name.trim().split(/\s+/).slice(0, 2);
+      return parts.map(p => p[0]?.toUpperCase() || '').join('');
+    }
+
+    function colorFromName(name = '') {
+      let hash = 0;
+      for (let i = 0; i < name.length; i++) {
+        hash = name.charCodeAt(i) + ((hash << 5) - hash);
+      }
+      const hue = Math.abs(hash) % 360;
+      return `hsl(${hue} 70% 45%)`;
+    }
+
+    function nl2br(str = '') {
+      return escapeHTML(str).replaceAll('\n', '<br>');
+    }
+
+    function snippet(txt = '', len = 120) {
+      const s = txt.replace(/\s+/g, ' ').trim();
+      return s.length > len ? s.slice(0, len - 1) + '…' : s;
+    }
+
+    function shouldAutoScroll() {
+      const threshold = 120;
+      const distance = chatScroll.scrollHeight - (chatScroll.scrollTop + chatScroll.clientHeight);
+      return distance < threshold;
+    }
+
+    function scrollToBottom(smooth = true) {
+      chatScroll.scrollTo({ top: chatScroll.scrollHeight, behavior: smooth ? 'smooth' : 'auto' });
+    }
+
+    function ensureUsername() {
+      let u = localStorage.getItem(USER_KEY);
+      while (!u || !u.trim()) {
+        u = prompt('Pick a display name (will be shown publicly):') || '';
+        u = u.trim().slice(0, 32);
+      }
+      localStorage.setItem(USER_KEY, u);
+      return u;
+    }
+
+    // ==========
+    // Theme
+    // ==========
+    function setTheme(mode) {
+      // mode: 'light' | 'dark' | 'system'
+      document.documentElement.setAttribute('data-theme', mode);
+      localStorage.setItem(THEME_KEY, mode);
+      if (mode === 'dark') {
+        themeIconEl.textContent = '☀️';
+        themeLabelEl.textContent = 'Light';
+      } else if (mode === 'light') {
+        themeIconEl.textContent = '🌙';
+        themeLabelEl.textContent = 'Dark';
+      } else {
+        const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        themeIconEl.textContent = prefersDark ? '☀️' : '🌙';
+        themeLabelEl.textContent = prefersDark ? 'Light' : 'Dark';
+      }
+    }
+    function initTheme() {
+      const saved = localStorage.getItem(THEME_KEY) || 'light';
+      setTheme(saved);
+    }
+    themeToggleBtn.addEventListener('click', () => {
+      const current = document.documentElement.getAttribute('data-theme') || 'light';
+      const next = current === 'light' ? 'dark' : 'light';
+      setTheme(next);
+    });
+
+    // ==========
+    // Rendering
+    // ==========
+    function ensureReplyPreview(row) {
+      const rid = row.reply_to;
+      if (!rid) return '';
+      const replied = messageCache.get(rid);
+      if (!replied) {
+        return `<div class="reply-preview" data-target="${rid}" title="Original message">
+          <span class="rp-author">Unknown</span>: <em>Message unavailable</em>
+        </div>`;
+      }
+      return `<div class="reply-preview" data-target="${rid}" title="Jump to original">
+        <span class="rp-author">${escapeHTML(replied.username)}</span>:
+        ${escapeHTML(snippet(replied.text, 140))}
+      </div>`;
+    }
+
+    function reactionsFor(row) {
+      const base = row.reactions || { '👍': [], '👎': [] };
+      if (!base['👍']) base['👍'] = [];
+      if (!base['👎']) base['👎'] = [];
+      return base;
+    }
+
+    function messageHTML(row) {
+      const me = row.username === currentUser;
+      const avatarColor = colorFromName(row.username);
+      const replyHTML = ensureReplyPreview(row);
+      const react = reactionsFor(row);
+      const myLike = react['👍'].includes(currentUser);
+      const myDislike = react['👎'].includes(currentUser);
+      const likeCount = react['👍'].length;
+      const dislikeCount = react['👎'].length;
+
+      return `
+        <div class="avatar" style="background:${avatarColor}" title="${escapeHTML(row.username)}">
+          ${escapeHTML(initials(row.username))}
         </div>
-    </div>
+        <div class="bubble">
+          <div class="meta">
+            <div>
+              <span class="name">${escapeHTML(row.username)}</span>
+            </div>
+            <div>
+              <time class="time" datetime="${row.created_at}" title="${fullTime(row.created_at)}">${formatTime(row.created_at)}</time>
+            </div>
+          </div>
 
-    <script src="app.js"></script>
+          ${replyHTML}
+
+          <div class="text" data-role="text">${nl2br(row.text)}</div>
+
+          <div class="actions" data-role="actions">
+            <button class="action reply" data-action="reply" title="Reply">↩ Reply</button>
+
+            ${me ? `<button class="action edit" data-action="edit" title="Edit">✎ Edit</button>` : ''}
+            ${me ? `<button class="action danger" data-action="delete" title="Delete">🗑 Delete</button>` : ''}
+
+            <button class="action reaction ${myLike ? 'active' : ''}" data-action="react" data-emoji="👍" title="Like">
+              👍 ${likeCount ? `<span class="count">${likeCount}</span>` : ''}
+            </button>
+            <button class="action reaction ${myDislike ? 'active' : ''}" data-action="react" data-emoji="👎" title="Dislike">
+              👎 ${dislikeCount ? `<span class="count">${dislikeCount}</span>` : ''}
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
+    function createMessageEl(row) {
+      const li = document.createElement('li');
+      li.className = 'message' + (row.username === currentUser ? ' from-me' : '');
+      li.dataset.id = row.id;
+      li.innerHTML = messageHTML(row);
+      attachMessageHandlers(li, row);
+      return li;
+    }
+
+    function rerenderMessageEl(li, row) {
+      li.className = 'message' + (row.username === currentUser ? ' from-me' : '');
+      li.innerHTML = messageHTML(row);
+      attachMessageHandlers(li, row);
+    }
+
+    function attachMessageHandlers(li, row) {
+      const rp = li.querySelector('.reply-preview');
+      if (rp) {
+        rp.addEventListener('click', () => {
+          const targetId = Number(rp.dataset.target);
+          const tEl = elementCache.get(targetId);
+          if (tEl) {
+            tEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            tEl.querySelector('.bubble')?.classList.add('highlight');
+            setTimeout(() => tEl.querySelector('.bubble')?.classList.remove('highlight'), 1200);
+          }
+        });
+      }
+
+      li.querySelectorAll('button[data-action]').forEach(btn => {
+        const action = btn.dataset.action;
+        if (action === 'reply') {
+          btn.addEventListener('click', () => startReply(row));
+        } else if (action === 'edit') {
+          btn.addEventListener('click', () => startEdit(li, row));
+        } else if (action === 'delete') {
+          btn.addEventListener('click', () => deleteMessage(row));
+        } else if (action === 'react') {
+          const emoji = btn.dataset.emoji;
+          btn.addEventListener('click', () => toggleReaction(row, emoji));
+        }
+      });
+    }
+
+    function addMessage(row, { scroll = true } = {}) {
+      messageCache.set(row.id, row);
+      const li = createMessageEl(row);
+      elementCache.set(row.id, li);
+      messagesEl.appendChild(li);
+      if (scroll) scrollToBottom(true);
+    }
+
+    function updateMessage(row) {
+      messageCache.set(row.id, row);
+      const li = elementCache.get(row.id);
+      if (li) {
+        rerenderMessageEl(li, row);
+      } else {
+        addMessage(row, { scroll: false });
+      }
+    }
+
+    function removeMessage(id) {
+      messageCache.delete(id);
+      const li = elementCache.get(id);
+      if (li) {
+        li.style.opacity = '0.3';
+        li.style.transition = 'opacity 160ms ease, transform 160ms ease';
+        li.style.transform = 'translateX(-6px)';
+        setTimeout(() => {
+          li.remove();
+          elementCache.delete(id);
+        }, 160);
+      }
+    }
+
+    // ==========
+    // Composer
+    // ==========
+    function setSendBtnState() {
+      const hasText = inputEl.value.trim().length > 0;
+      sendBtn.disabled = !hasText;
+    }
+    inputEl.addEventListener('input', setSendBtnState);
+    inputEl.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    });
+    sendBtn.addEventListener('click', sendMessage);
+
+    function startReply(row) {
+      replyTarget = { id: row.id, username: row.username, text: row.text };
+      replyAuthorEl.textContent = row.username;
+      replySnippetEl.textContent = snippet(row.text, 160);
+      replyBar.classList.add('visible');
+      inputEl.focus();
+    }
+    replyCancelBtn.addEventListener('click', () => {
+      replyTarget = null;
+      replyBar.classList.remove('visible');
+    });
+
+    async function sendMessage() {
+      const text = inputEl.value.trim();
+      if (!text) return;
+      const payload = {
+        username: currentUser,
+        text,
+        reply_to: replyTarget ? replyTarget.id : null,
+        reactions: { '👍': [], '👎': [] }
+      };
+
+      sendBtn.disabled = true;
+      const autoScroll = shouldAutoScroll();
+
+      const { data, error } = await supabase.from(MSG_TABLE).insert(payload).select().single();
+      if (error) {
+        console.error('Send error:', error);
+        alert('Failed to send. Check console and Supabase configuration.');
+      } else {
+        if (!messageCache.has(data.id)) addMessage(data, { scroll: autoScroll });
+      }
+
+      inputEl.value = '';
+      setSendBtnState();
+      replyTarget = null;
+      replyBar.classList.remove('visible');
+      if (autoScroll) scrollToBottom(true);
+    }
+
+    // ==========
+    // Edit/Delete
+    // ==========
+    function startEdit(li, row) {
+      const bubble = li.querySelector('.bubble');
+      const textDiv = bubble.querySelector('[data-role="text"]');
+      const original = row.text;
+
+      const editWrap = document.createElement('div');
+      editWrap.className = 'edit-area';
+      editWrap.innerHTML = `
+        <textarea>${escapeHTML(original)}</textarea>
+        <div class="row">
+          <button class="btn ghost" data-ev="cancel">Cancel</button>
+          <button class="btn primary" data-ev="save">Save</button>
+        </div>
+      `;
+
+      textDiv.style.display = 'none';
+      bubble.appendChild(editWrap);
+
+      const ta = editWrap.querySelector('textarea');
+      ta.focus();
+      ta.selectionStart = ta.value.length;
+      const cancelBtn = editWrap.querySelector('[data-ev="cancel"]');
+      const saveBtn = editWrap.querySelector('[data-ev="save"]');
+
+      const cleanup = () => {
+        editWrap.remove();
+        textDiv.style.display = '';
+      };
+
+      cancelBtn.addEventListener('click', cleanup);
+
+      saveBtn.addEventListener('click', async () => {
+        const newText = ta.value.trim();
+        if (!newText) {
+          alert('Message cannot be empty.');
+          return;
+        }
+        const patch = { text: newText };
+        const { data, error } = await supabase.from(MSG_TABLE).update(patch).eq('id', row.id).select().single();
+        if (error) {
+          console.error('Edit error:', error);
+          alert('Failed to edit. Check console and Supabase configuration.');
+          return;
+        }
+        cleanup();
+        updateMessage(data);
+      });
+    }
+
+    async function deleteMessage(row) {
+      const ok = confirm('Delete this message? This cannot be undone.');
+      if (!ok) return;
+      const { error } = await supabase.from(MSG_TABLE).delete().eq('id', row.id);
+      if (error) {
+        console.error('Delete error:', error);
+        alert('Failed to delete. Check console and Supabase configuration.');
+      }
+    }
+
+    // ==========
+    // Reactions
+    // ==========
+    async function toggleReaction(row, emoji) {
+      const r = reactionsFor(row);
+      const set = new Set(r[emoji] || []);
+      if (set.has(currentUser)) set.delete(currentUser);
+      else set.add(currentUser);
+      r[emoji] = Array.from(set);
+      const { data, error } = await supabase.from(MSG_TABLE).update({ reactions: r }).eq('id', row.id).select().single();
+      if (error) {
+        console.error('Reaction error:', error);
+        alert('Failed to react. Check console and Supabase configuration.');
+        return;
+      }
+      updateMessage(data);
+    }
+
+    // ==========
+    // Supabase Realtime
+    // ==========
+    async function loadInitial() {
+      const { data, error } = await supabase
+        .from(MSG_TABLE)
+        .select('*')
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        console.error('Initial load error:', error);
+        messagesEl.innerHTML = `<li style="color: var(--muted); padding: 8px;">Failed to load messages. Check Supabase setup in the code.</li>`;
+        return;
+      }
+
+      messagesEl.innerHTML = '';
+      data.forEach(row => {
+        messageCache.set(row.id, row);
+        const li = createMessageEl(row);
+        elementCache.set(row.id, li);
+        messagesEl.appendChild(li);
+      });
+      scrollToBottom(false);
+    }
+
+    function subscribeRealtime() {
+      const channel = supabase
+        .channel('public:messages')
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: MSG_TABLE }, payload => {
+          const row = payload.new;
+          const autoScroll = shouldAutoScroll();
+          if (!messageCache.has(row.id)) addMessage(row, { scroll: autoScroll });
+        })
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: MSG_TABLE }, payload => {
+          const row = payload.new;
+          updateMessage(row);
+        })
+        .on('postgres_changes', { event: 'DELETE', schema: 'public', table: MSG_TABLE }, payload => {
+          removeMessage(payload.old.id);
+        })
+        .subscribe();
+      return channel;
+    }
+
+    // ==========
+    // Init
+    // ==========
+    async function init() {
+      initTheme();
+      currentUser = localStorage.getItem(USER_KEY) || ensureUsername();
+      inputEl.setAttribute('aria-label', `Message as ${currentUser}`);
+
+      await loadInitial();
+      subscribeRealtime();
+
+      setSendBtnState();
+    }
+
+    init();
+  </script>
 </body>
 </html>
