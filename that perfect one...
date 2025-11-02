@@ -1,0 +1,808 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Supabase Vanilla Chat</title>
+  <style>
+    /* CSS variables for light/dark themes */
+    :root {
+      --bg: #f7f7fb;
+      --card-bg: #ffffff;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --border: #e5e7eb;
+      --accent: #3b82f6;
+      --accent-contrast: #ffffff;
+      --danger: #ef4444;
+      --ok: #10b981;
+      --shadow: 0 8px 24px rgba(0,0,0,0.08);
+      --message-bg: #f9fafb;
+    }
+    [data-theme="dark"] {
+      --bg: #0f172a;
+      --card-bg: #111827;
+      --text: #e5e7eb;
+      --muted: #9ca3af;
+      --border: #1f2937;
+      --accent: #60a5fa;
+      --accent-contrast: #0b1220;
+      --danger: #f87171;
+      --ok: #34d399;
+      --shadow: 0 8px 24px rgba(0,0,0,0.35);
+      --message-bg: #0b1220;
+    }
+    html, body {
+      height: 100%;
+    }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
+    }
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      background: var(--bg);
+      z-index: 10;
+    }
+    header .left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    header h1 {
+      font-size: 18px;
+      margin: 0;
+    }
+    header .tagline {
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .dot {
+      width: 10px; height: 10px; border-radius: 50%;
+      background: var(--ok);
+      box-shadow: 0 0 0 2px rgba(16,185,129,0.2);
+    }
+    .dot.offline { background: var(--danger); box-shadow: 0 0 0 2px rgba(239,68,68,0.25); }
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .btn {
+      appearance: none;
+      border: 1px solid var(--border);
+      background: var(--card-bg);
+      color: var(--text);
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 14px;
+      cursor: pointer;
+      box-shadow: var(--shadow);
+    }
+    .btn:hover { filter: brightness(1.08); }
+    .btn:focus { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .btn.primary { background: var(--accent); color: var(--accent-contrast); border-color: transparent; }
+    .btn.danger { border-color: transparent; background: var(--danger); color: #fff; }
+    .toggle {
+      display: inline-flex; align-items: center; gap: 8px;
+    }
+    main {
+      display: flex;
+      justify-content: center;
+      padding: 16px;
+      min-height: calc(100% - 96px);
+    }
+    .card {
+      width: 100%;
+      max-width: 840px;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      box-shadow: var(--shadow);
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      overflow: hidden;
+    }
+    .messages {
+      position: relative;
+      overflow-y: auto;
+      padding: 16px;
+      background: var(--card-bg);
+    }
+    .new-indicator {
+      position: sticky;
+      bottom: 12px;
+      display: none;
+      justify-content: center;
+      z-index: 2;
+    }
+    .new-indicator.show { display: flex; }
+    .message {
+      display: grid;
+      grid-template-columns: 40px 1fr;
+      gap: 12px;
+      padding: 12px;
+      border-radius: 12px;
+      background: var(--message-bg);
+      margin-bottom: 12px;
+      opacity: 0;
+      transform: translateY(6px);
+      animation: fadeIn 220ms ease-out forwards;
+    }
+    @keyframes fadeIn {
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .avatar {
+      width: 40px; height: 40px; border-radius: 999px;
+      font-weight: 700; color: #fff;
+      display: inline-flex; align-items: center; justify-content: center;
+      user-select: none;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+    }
+    .msg-header {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 8px; font-size: 12px; color: var(--muted);
+      margin-bottom: 8px;
+    }
+    .msg-header .author { font-weight: 600; color: var(--text); }
+    .msg-text { white-space: pre-wrap; word-wrap: break-word; font-size: 14px; line-height: 1.5; }
+    .reply-preview {
+      margin: 8px 0 0 0;
+      padding: 8px;
+      border-left: 3px solid var(--border);
+      background: rgba(127,127,127,0.06);
+      border-radius: 8px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .msg-actions {
+      display: flex; align-items: center; gap: 8px; margin-top: 8px;
+    }
+    .icon-btn {
+      appearance: none; border: 1px solid var(--border); background: transparent; color: var(--text);
+      padding: 6px 8px; border-radius: 8px; font-size: 13px; cursor: pointer;
+      display: inline-flex; align-items: center; gap: 6px;
+    }
+    .icon-btn:hover { background: rgba(99,102,241,0.08); }
+    .icon-btn[disabled] { opacity: 0.5; cursor: default; }
+    .reactions {
+      display: inline-flex; align-items: center; gap: 8px; margin-left: auto;
+    }
+    .composer {
+      border-top: 1px solid var(--border);
+      background: var(--card-bg);
+      padding: 12px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+    }
+    .reply-bar {
+      grid-column: 1 / -1;
+      display: none; align-items: center; justify-content: space-between;
+      gap: 8px; padding: 8px; border-radius: 8px; background: rgba(99,102,241,0.08);
+      color: var(--muted);
+    }
+    .reply-bar.show { display: flex; }
+    textarea {
+      width: 100%; min-height: 60px; max-height: 200px; resize: vertical;
+      padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border);
+      background: var(--card-bg); color: var(--text); font-size: 14px;
+    }
+    textarea:focus { outline: 2px solid var(--accent); }
+    footer {
+      border-top: 1px solid var(--border); background: var(--bg);
+      color: var(--muted); font-size: 12px;
+      padding: 12px 16px; text-align: center;
+    }
+    .auth {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 12px; color: var(--muted);
+    }
+    .auth input[type="email"] {
+      padding: 6px 8px; border-radius: 6px; border: 1px solid var(--border);
+      background: var(--card-bg); color: var(--text);
+    }
+    .pending { opacity: 0.6; }
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+  <header role="banner" aria-label="Header">
+    <div class="left">
+      <h1 aria-label="App title">Supabase Vanilla Chat</h1>
+      <span class="tagline">Realtime messages, no frameworks</span>
+    </div>
+    <div class="controls">
+      <span class="status" aria-live="polite" aria-atomic="true">
+        <span id="connDot" class="dot"></span><span id="connText">Online</span>
+      </span>
+      <div class="auth" id="authPanel">
+        <span id="userLabel">Guest</span>
+        <input id="emailInput" type="email" placeholder="email for magic link" aria-label="Email for magic link" />
+        <button class="btn" id="sendLinkBtn" aria-label="Send magic link">Send link</button>
+        <button class="btn" id="signOutBtn" aria-label="Sign out" style="display:none;">Sign out</button>
+      </div>
+      <button id="themeToggle" class="btn toggle" aria-label="Toggle theme">
+        <span id="themeIcon" aria-hidden="true">🌙</span><span id="themeText">Dark</span>
+      </button>
+    </div>
+  </header>
+
+  <main role="main">
+    <div class="card" aria-label="Chat container">
+      <div id="messages" class="messages" aria-live="polite" aria-relevant="additions text">
+        <div id="newIndicator" class="new-indicator">
+          <button class="btn primary" id="jumpToBottomBtn" aria-label="Jump to latest messages">New messages ↓</button>
+        </div>
+      </div>
+      <div class="composer" aria-label="Message composer">
+        <div id="replyBar" class="reply-bar" role="status" aria-live="polite">
+          <span id="replyInfo">Replying to …</span>
+          <button class="btn" id="cancelReplyBtn" aria-label="Cancel reply">Cancel</button>
+        </div>
+        <textarea id="input" placeholder="Type a message… (Enter to send, Shift+Enter for newline)" aria-label="Message input"></textarea>
+        <button id="sendBtn" class="btn primary" disabled aria-label="Send message">Send</button>
+      </div>
+    </div>
+  </main>
+
+  <footer role="contentinfo">made with ❤️☕️</footer>
+
+  <!-- Import map to load Supabase JS from CDN while preserving the exact import snippet -->
+  <script type="importmap">
+    {
+      "imports": {
+        "@supabase/supabase-js": "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm"
+      }
+    }
+  </script>
+
+  <script type="module">
+    /* Supabase client: exact snippet (URL and key unchanged) */
+    import { createClient } from '@supabase/supabase-js'
+
+    const supabaseUrl = 'https://fzjkpppzwiuozvszbbdl.supabase.co'
+    const supabaseKey = 'sb_publishable_ClRXbub_U_y3zA3E9oFdUg_vyzDiPtN'
+    const supabase = createClient(supabaseUrl, supabaseKey)
+
+    /* ---------- App State ---------- */
+    const state = {
+      messages: new Map(),   // id -> message record
+      order: [],             // ordered ids by created_at
+      replyTo: null,         // message id being replied to
+      user: null,            // supabase.auth.getUser() result
+      username: null,        // display username (local or derived from auth)
+      online: navigator.onLine,
+      initialLoaded: false
+    };
+
+    /* ---------- DOM ---------- */
+    const themeToggle = document.getElementById('themeToggle');
+    const themeIcon = document.getElementById('themeIcon');
+    const themeText = document.getElementById('themeText');
+    const messagesEl = document.getElementById('messages');
+    const inputEl = document.getElementById('input');
+    const sendBtn = document.getElementById('sendBtn');
+    const replyBar = document.getElementById('replyBar');
+    const replyInfo = document.getElementById('replyInfo');
+    const cancelReplyBtn = document.getElementById('cancelReplyBtn');
+    const connDot = document.getElementById('connDot');
+    const connText = document.getElementById('connText');
+    const jumpToBottomBtn = document.getElementById('jumpToBottomBtn');
+    const authPanel = document.getElementById('authPanel');
+    const userLabel = document.getElementById('userLabel');
+    const emailInput = document.getElementById('emailInput');
+    const sendLinkBtn = document.getElementById('sendLinkBtn');
+    const signOutBtn = document.getElementById('signOutBtn');
+
+    /* ---------- Theme ---------- */
+    const savedTheme = localStorage.getItem('theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    setTheme(savedTheme);
+    themeToggle.addEventListener('click', () => setTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'));
+    function setTheme(theme) {
+      document.documentElement.dataset.theme = theme;
+      localStorage.setItem('theme', theme);
+      const isDark = theme === 'dark';
+      themeIcon.textContent = isDark ? '🌞' : '🌙';
+      themeText.textContent = isDark ? 'Light' : 'Dark';
+    }
+
+    /* ---------- Connectivity ---------- */
+    updateConnUI();
+    window.addEventListener('online', () => { state.online = true; updateConnUI(); });
+    window.addEventListener('offline', () => { state.online = false; updateConnUI(); });
+    function updateConnUI() {
+      connDot.classList.toggle('offline', !state.online);
+      connText.textContent = state.online ? 'Online' : 'Offline';
+      sendBtn.disabled = !state.online || inputEl.value.trim().length === 0;
+    }
+
+    /* ---------- Auth (optional email magic link) ---------- */
+    // If configured, magic link sign-in updates session; otherwise app stays in guest mode.
+    initAuth();
+    async function initAuth() {
+      const { data: { user } } = await supabase.auth.getUser();
+      state.user = user || null;
+      const localUsername = localStorage.getItem('username');
+      if (!localUsername) {
+        const promptName = prompt('Pick a display name (shown to others):') || 'Guest';
+        localStorage.setItem('username', promptName.trim().slice(0, 32) || 'Guest');
+      }
+      state.username = localStorage.getItem('username');
+      refreshAuthUI();
+    }
+    function refreshAuthUI() {
+      if (state.user) {
+        const display = state.user.user_metadata?.full_name || state.user.email || ('User ' + state.user.id.slice(0, 6));
+        userLabel.textContent = display;
+        signOutBtn.style.display = 'inline-block';
+        emailInput.style.display = 'none';
+        sendLinkBtn.style.display = 'none';
+      } else {
+        userLabel.textContent = `Guest: ${state.username}`;
+        signOutBtn.style.display = 'none';
+        emailInput.style.display = 'inline-block';
+        sendLinkBtn.style.display = 'inline-block';
+      }
+    }
+    sendLinkBtn.addEventListener('click', async () => {
+      const email = (emailInput.value || '').trim();
+      if (!email) {
+        alert('Enter an email to receive a sign-in link.');
+        return;
+      }
+      try {
+        // Magic link sign-in; ensure email auth is enabled in your Supabase project.
+        const { error } = await supabase.auth.signInWithOtp({
+          email,
+          options: { emailRedirectTo: window.location.href }
+        });
+        if (error) throw error;
+        alert('Check your email for the magic link. After clicking it, you will be signed in here.');
+      } catch (e) {
+        console.error(e);
+        alert('Failed to send magic link: ' + e.message);
+      }
+    });
+    signOutBtn.addEventListener('click', async () => {
+      await supabase.auth.signOut();
+      state.user = null;
+      refreshAuthUI();
+    });
+    supabase.auth.onAuthStateChange((_event, session) => {
+      state.user = session?.user || null;
+      refreshAuthUI();
+    });
+
+    /* ---------- Utilities ---------- */
+    function initials(name) {
+      const parts = name.trim().split(/\s+/);
+      return (parts[0]?.[0] || '').toUpperCase() + (parts[1]?.[0] || '').toUpperCase();
+    }
+    function stringToColor(seed) {
+      // Deterministic HSL color based on string hash, visually distinct
+      let h = 0;
+      for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
+      const hue = h % 360;
+      return `hsl(${hue}deg, 65%, ${document.documentElement.dataset.theme === 'dark' ? '45%' : '55%'})`;
+    }
+    function isNearBottom(el, threshold = 64) {
+      return el.scrollTop >= (el.scrollHeight - el.clientHeight - threshold);
+    }
+    function smoothScrollToBottom() {
+      messagesEl.scrollTo({ top: messagesEl.scrollHeight, behavior: 'smooth' });
+    }
+    function iso(ts) { try { return new Date(ts).toISOString(); } catch { return ts; } }
+
+    /* ---------- Rendering ---------- */
+    function renderAll() {
+      messagesEl.querySelectorAll('.message[data-id]').forEach(n => n.remove());
+      for (const id of state.order) {
+        const msg = state.messages.get(id);
+        const node = renderMessage(msg);
+        messagesEl.insertBefore(node, document.getElementById('newIndicator'));
+      }
+    }
+
+    function renderMessage(msg) {
+      const container = document.createElement('div');
+      container.className = 'message';
+      container.dataset.id = msg.id;
+
+      // Avatar
+      const avatar = document.createElement('div');
+      avatar.className = 'avatar';
+      avatar.style.background = stringToColor(msg.username || 'User');
+      avatar.textContent = initials(msg.username || 'U');
+
+      // Right column
+      const right = document.createElement('div');
+      const header = document.createElement('div');
+      header.className = 'msg-header';
+      const author = document.createElement('span');
+      author.className = 'author';
+      author.textContent = msg.username || 'Unknown';
+      const time = document.createElement('time');
+      time.dateTime = iso(msg.created_at);
+      time.textContent = iso(msg.created_at);
+      header.append(author, time);
+
+      // Text
+      const text = document.createElement('div');
+      text.className = 'msg-text';
+      text.textContent = msg.text; // avoid HTML injection
+
+      // Reply preview
+      if (msg.reply_to) {
+        const parent = state.messages.get(msg.reply_to);
+        const preview = document.createElement('div');
+        preview.className = 'reply-preview';
+        const by = parent ? (parent.username || 'Unknown') : '…';
+        const snippet = parent ? (parent.text || '').slice(0, 150) : 'Loading…';
+        preview.textContent = `Replying to ${by}: “${snippet}${(parent && parent.text.length > 150) ? '…' : ''}”`;
+        right.append(preview);
+      }
+
+      // Actions
+      const actions = document.createElement('div');
+      actions.className = 'msg-actions';
+      const replyBtn = btn('↩️ Reply', 'reply', 'Reply to this message');
+      const canEdit = isOwn(msg);
+      const editBtn = btn('✏️ Edit', 'edit', 'Edit message');
+      const delBtn = btn('🗑️ Delete', 'delete', 'Delete message');
+      editBtn.disabled = !canEdit;
+      delBtn.disabled = !canEdit;
+
+      const reactions = document.createElement('div');
+      reactions.className = 'reactions';
+      const upBtn = btn(`👍 ${msg.up_count || 0}`, 'up', 'Thumbs up');
+      const downBtn = btn(`👎 ${msg.down_count || 0}`, 'down', 'Thumbs down');
+
+      actions.append(replyBtn, editBtn, delBtn, reactions);
+      reactions.append(upBtn, downBtn);
+
+      right.append(header, text, actions);
+      container.append(avatar, right);
+
+      // For inline editing
+      container._textEl = text;
+      container._upBtn = upBtn;
+      container._downBtn = downBtn;
+
+      return container;
+    }
+
+    function btn(label, action, aria) {
+      const b = document.createElement('button');
+      b.className = 'icon-btn';
+      b.textContent = label;
+      b.setAttribute('aria-label', aria);
+      b.dataset.action = action;
+      return b;
+    }
+
+    function isOwn(msg) {
+      if (state.user?.id && msg.user_id) return state.user.id === msg.user_id;
+      return (msg.username || '') === (state.username || '');
+    }
+
+    /* ---------- Load & Realtime ---------- */
+    await initialLoad();
+    subscribeRealtime();
+
+    async function initialLoad() {
+      try {
+        const { data, error } = await supabase
+          .from('messages')
+          .select('*')
+          .order('created_at', { ascending: true });
+        if (error) throw error;
+        state.messages.clear();
+        state.order.length = 0;
+        for (const m of data || []) {
+          state.messages.set(m.id, m);
+          state.order.push(m.id);
+        }
+        state.initialLoaded = true;
+        renderAll();
+        smoothScrollToBottom();
+      } catch (e) {
+        console.error('Initial load failed:', e);
+        alert('Failed to load messages. Please check your Supabase table and CORS settings.');
+      }
+    }
+
+    function subscribeRealtime() {
+      const channel = supabase
+        .channel('public:messages')
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, handleInsert)
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, handleUpdate)
+        .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'messages' }, handleDelete)
+        .subscribe((status) => {
+          // Status callback in v2 is limited; we reflect online status via navigator.onLine
+          // but keep this hook for completeness.
+          // console.log('Realtime status:', status);
+        });
+    }
+
+    function handleInsert(payload) {
+      const msg = payload.new;
+      state.messages.set(msg.id, msg);
+      // Insert in order by created_at; if created_at equal, append
+      const idx = state.order.findIndex(id => (state.messages.get(id).created_at > msg.created_at));
+      if (idx === -1) state.order.push(msg.id); else state.order.splice(idx, 0, msg.id);
+
+      // If we had a pending placeholder with tempId, remove it
+      const pending = messagesEl.querySelector(`.message[data-temp="${msg.client_ref || ''}"]`);
+      if (pending) pending.remove();
+
+      const node = renderMessage(msg);
+      messagesEl.insertBefore(node, document.getElementById('newIndicator'));
+
+      // Scroll behavior
+      if (isNearBottom(messagesEl)) {
+        smoothScrollToBottom();
+      } else {
+        document.getElementById('newIndicator').classList.add('show');
+      }
+    }
+
+    function handleUpdate(payload) {
+      const msg = payload.new;
+      const old = state.messages.get(msg.id);
+      state.messages.set(msg.id, msg);
+      // Patch DOM
+      const node = messagesEl.querySelector(`.message[data-id="${msg.id}"]`);
+      if (!node) {
+        // Not rendered (e.g., update before initial load), insert now
+        const newNode = renderMessage(msg);
+        messagesEl.insertBefore(newNode, document.getElementById('newIndicator'));
+      } else {
+        // Update fields
+        node.querySelector('.author').textContent = msg.username || 'Unknown';
+        const timeEl = node.querySelector('time');
+        timeEl.dateTime = iso(msg.created_at);
+        timeEl.textContent = iso(msg.created_at);
+        node._textEl.textContent = msg.text;
+        node._upBtn.textContent = `👍 ${msg.up_count || 0}`;
+        node._downBtn.textContent = `👎 ${msg.down_count || 0}`;
+      }
+    }
+
+    function handleDelete(payload) {
+      const id = payload.old.id;
+      state.messages.delete(id);
+      state.order = state.order.filter(x => x !== id);
+      const node = messagesEl.querySelector(`.message[data-id="${id}"]`);
+      if (node) node.remove();
+    }
+
+    /* ---------- Composer ---------- */
+    inputEl.addEventListener('input', () => {
+      sendBtn.disabled = !state.online || inputEl.value.trim().length === 0;
+    });
+    inputEl.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        if (!sendBtn.disabled) sendMessage();
+      } else if (e.key === 'Escape') {
+        cancelReply();
+      }
+    });
+    sendBtn.addEventListener('click', sendMessage);
+    cancelReplyBtn.addEventListener('click', cancelReply);
+    jumpToBottomBtn.addEventListener('click', () => {
+      smoothScrollToBottom();
+      document.getElementById('newIndicator').classList.remove('show');
+    });
+
+    function showReplyBar(parentMsg) {
+      replyBar.classList.add('show');
+      replyInfo.textContent = `Replying to ${parentMsg.username}: “${(parentMsg.text || '').slice(0, 120)}${parentMsg.text.length > 120 ? '…' : ''}”`;
+    }
+    function cancelReply() {
+      state.replyTo = null;
+      replyBar.classList.remove('show');
+    }
+
+    async function sendMessage() {
+      const text = inputEl.value.trim();
+      if (!text || !state.online) return;
+      const clientRef = 'c' + Math.random().toString(36).slice(2);
+      // Optimistic placeholder
+      const optimistic = {
+        id: clientRef, // temp id
+        client_ref: clientRef,
+        user_id: state.user?.id || null,
+        username: state.username || 'Guest',
+        text,
+        created_at: new Date().toISOString(),
+        reply_to: state.replyTo,
+        up_count: 0,
+        down_count: 0
+      };
+      const node = renderMessage(optimistic);
+      node.dataset.temp = clientRef;
+      node.classList.add('pending');
+      messagesEl.insertBefore(node, document.getElementById('newIndicator'));
+      if (isNearBottom(messagesEl)) smoothScrollToBottom();
+
+      try {
+        const { data, error } = await supabase
+          .from('messages')
+          .insert({
+            user_id: state.user?.id || null,
+            username: state.username || 'Guest',
+            text,
+            reply_to: state.replyTo
+          })
+          .select()
+          .single();
+        if (error) throw error;
+        // The realtime INSERT handler will render the canonical row.
+        inputEl.value = '';
+        sendBtn.disabled = true;
+        cancelReply();
+      } catch (e) {
+        console.error('Send failed:', e);
+        node.classList.remove('pending');
+        node.classList.add('error');
+        alert('Failed to send message. Are you offline or missing DB permissions?');
+      }
+    }
+
+    /* ---------- Actions (event delegation) ---------- */
+    messagesEl.addEventListener('click', async (e) => {
+      const btn = e.target.closest('button.icon-btn');
+      if (!btn) return;
+      const action = btn.dataset.action;
+      const msgNode = e.target.closest('.message');
+      const id = msgNode?.dataset.id;
+      const msg = state.messages.get(id);
+      if (!msg) return;
+
+      switch (action) {
+        case 'reply':
+          state.replyTo = id;
+          showReplyBar(msg);
+          inputEl.focus();
+          break;
+        case 'edit':
+          if (!isOwn(msg)) return;
+          beginInlineEdit(msgNode, msg);
+          break;
+        case 'delete':
+          if (!isOwn(msg)) return;
+          if (!confirm('Delete this message?')) return;
+          await deleteMessage(id, msgNode);
+          break;
+        case 'up':
+          await react(msg, 'up', +1, msgNode._upBtn);
+          break;
+        case 'down':
+          await react(msg, 'down', +1, msgNode._downBtn);
+          break;
+      }
+    });
+
+    function beginInlineEdit(node, msg) {
+      const textEl = node._textEl;
+      const original = msg.text;
+      const area = document.createElement('textarea');
+      area.value = original;
+      area.style.width = '100%';
+      area.rows = Math.min(6, Math.max(2, Math.ceil(original.length / 60)));
+      textEl.replaceWith(area);
+      node._editArea = area;
+
+      // Controls
+      const controls = document.createElement('div');
+      controls.style.display = 'flex'; controls.style.gap = '8px'; controls.style.marginTop = '8px';
+      const saveBtn = document.createElement('button'); saveBtn.className = 'btn primary'; saveBtn.textContent = 'Save';
+      const cancelBtn = document.createElement('button'); cancelBtn.className = 'btn'; cancelBtn.textContent = 'Cancel';
+      node.querySelector('.msg-actions').append(controls);
+      controls.append(saveBtn, cancelBtn);
+
+      area.focus();
+
+      const cleanup = () => {
+        controls.remove();
+        area.replaceWith(node._textEl);
+        node._editArea = null;
+      };
+
+      cancelBtn.addEventListener('click', cleanup);
+      area.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.preventDefault(); cleanup(); } });
+
+      saveBtn.addEventListener('click', async () => {
+        const newText = (area.value || '').trim();
+        if (!newText || newText === original) { cleanup(); return; }
+        // Optimistic change
+        node._textEl.textContent = newText;
+        cleanup();
+        try {
+          const { error } = await supabase
+            .from('messages')
+            .update({ text: newText, edited_at: new Date().toISOString() })
+            .eq('id', msg.id);
+          if (error) throw error;
+        } catch (e) {
+          // Rollback
+          console.error('Edit failed:', e);
+          node._textEl.textContent = original;
+          alert('Failed to edit message (check RLS or permissions).');
+        }
+      });
+    }
+
+    async function deleteMessage(id, node) {
+      // Optimistic remove
+      node.remove();
+      try {
+        const { error } = await supabase
+          .from('messages')
+          .delete()
+          .eq('id', id);
+        if (error) throw error;
+      } catch (e) {
+        console.error('Delete failed:', e);
+        // Rollback: re-render the message
+        const msg = state.messages.get(id);
+        if (msg) {
+          const restored = renderMessage(msg);
+          messagesEl.insertBefore(restored, document.getElementById('newIndicator'));
+        }
+        alert('Failed to delete (check RLS or permissions).');
+      }
+    }
+
+    async function react(msg, kind, delta, btnEl) {
+      // Optimistic bump
+      const original = kind === 'up' ? (msg.up_count || 0) : (msg.down_count || 0);
+      const next = original + delta;
+      btnEl.textContent = (kind === 'up' ? `👍 ${next}` : `👎 ${next}`);
+      try {
+        const { error } = await supabase.rpc('increment_message_reaction', { mid: msg.id, kind, delta });
+        if (error) throw error;
+        // Server UPDATE will arrive via realtime and patch canonical counts.
+      } catch (e) {
+        console.error('Reaction failed:', e);
+        // Rollback
+        btnEl.textContent = (kind === 'up' ? `👍 ${original}` : `👎 ${original}`);
+        alert('Failed to react (check function & permissions).');
+      }
+    }
+
+    /* ---------- Scroll preserve behavior ---------- */
+    messagesEl.addEventListener('scroll', () => {
+      if (isNearBottom(messagesEl)) {
+        document.getElementById('newIndicator').classList.remove('show');
+      }
+    });
+
+    /* ---------- Small helpers for ownership and display ---------- */
+    // Ensure local username exists and is editable
+    (function initUsername() {
+      const current = localStorage.getItem('username');
+      if (!current) return;
+      state.username = current;
+    })();
+
+  </script>
+</body>
+</html>
