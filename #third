@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-time Chat</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module">
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm'
+
+        const supabaseUrl = 'https://fzjkpppzwiuozvszbbdl.supabase.co'
+        const supabaseKey = 'sb_publishable_ClRXbub_U_y3zA3E9oFdUg_vyzDiPtN'
+        const supabase = createClient(supabaseUrl, supabaseKey)
+
+        // Theme management
+        const initTheme = () => {
+            const saved = localStorage.getItem('theme')
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+            const theme = saved || (prefersDark ? 'dark' : 'light')
+            document.documentElement.setAttribute('data-theme', theme)
+            return theme
+        }
+
+        // CSS Variables for theming
+        const style = document.createElement('style')
+        style.textContent = `
+            :root {
+                --bg-primary: 255, 255, 255;
+                --bg-secondary: 249, 250, 251;
+                --bg-tertiary: 243, 244, 246;
+                --text-primary: 17, 24, 39;
+                --text-secondary: 107, 114, 128;
+                --border: 229, 231, 235;
+                --accent: 99, 102, 241;
+            }
+            [data-theme="dark"] {
+                --bg-primary: 17, 24, 39;
+                --bg-secondary: 31, 41, 55;
+                --bg-tertiary: 55, 65, 81;
+                --text-primary: 243, 244, 246;
+                --text-secondary: 156, 163, 175;
+                --border: 75, 85, 99;
+                --accent: 139, 92, 246;
+            }
+            body { 
+                background: rgb(var(--bg-primary)); 
+                color: rgb(var(--text-primary));
+                transition: all 0.3s ease;
+            }
+            .bg-secondary { background: rgb(var(--bg-secondary)); }
+            .bg-tertiary { background: rgb(var(--bg-tertiary)); }
+            .text-secondary { color: rgb(var(--text-secondary)); }
+            .border-custom { border-color: rgb(var(--border)); }
+            .accent { color: rgb(var(--accent)); }
+            .bg-accent { background: rgb(var(--accent)); }
+            .message-enter {
+                animation: slideIn 0.3s ease-out;
+            }
+            @keyframes slideIn {
+                from { opacity: 0; transform: translateY(10px); }
+                to { opacity: 1; transform: translateY(0); }
+            }
+            .scroll-smooth { scroll-behavior: smooth; }
+            .connection-indicator {
+                transition: all 0.3s ease;
+            }
+        `
+        document.head.appendChild(style)
+
+        // App state
+        let currentTheme = initTheme()
+        let username = localStorage.getItem('chat-username') || ''
+        let messages = []
+        let replyingTo = null
+        let editingId = null
+        let isNearBottom = true
+        let connectionStatus = 'connecting'
+
+        // DOM elements
+        const chatContainer = document.getElementById('chat-container')
+        const messagesArea = document.getElementById('messages-area')
+        const messageInput = document.getElementById('message-input')
+        const sendButton = document.getElementById('send-button')
+        const themeToggle = document.getElementById('theme-toggle')
+        const connectionIndicator = document.getElementById('connection-indicator')
+        const replyBar = document.getElementById('reply-bar')
+        const usernameModal = document.getElementById('username-modal')
+
+        // Generate deterministic avatar color from username
+        const getAvatarColor = (name) => {
+            const colors = [
+                'bg-red-500', 'bg-blue-500', 'bg-green-500', 'bg-yellow-500',
+                'bg-purple-500', 'bg-pink-500', 'bg-indigo-500', 'bg-teal-500'
+            ]
+            let hash = 0
+            for (let i = 0; i < name.length; i++) {
+                hash = name.charCodeAt(i) + ((hash << 5) - hash)
+            }
+            return colors[Math.abs(hash) % colors.length]
+        }
+
+        // Get initials from username
+        const getInitials = (name) => {
+            return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+        }
+
+        // Format timestamp
+        const formatTime = (timestamp) => {
+            return new Date(timestamp).toLocaleString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            })
+        }
+
+        // Create message element
+        const createMessageElement = (message) => {
+            const div = document.createElement('div')
+            div.className = 'message-enter bg-secondary rounded-lg p-4 mb-3 border border-custom'
+            div.dataset.id = message.id
+
+            const isOwn = message.username === username
+            const avatarColor = getAvatarColor(message.username)
+            const initials = getInitials(message.username)
+
+            let replyPreview = ''
+            if (message.reply_to) {
+                const parentMsg = messages.find(m => m.id === message.reply_to)
+                if (parentMsg) {
+                    replyPreview = `
+                        <div class="text-secondary text-sm mb-2 pl-2 border-l-2 border-gray-400">
+                            <span class="font-medium">${parentMsg.username}</span>: ${parentMsg.text.slice(0, 50)}${parentMsg.text.length > 50 ? '...' : ''}
+                        </div>
+                    `
+                }
+            }
+
+            div.innerHTML = `
+                <div class="flex items-start gap-3">
+                    <div class="${avatarColor} w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold flex-shrink-0">
+                        ${initials}
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-2 mb-1">
+                            <span class="font-medium">${message.username}</span>
+                            <span class="text-secondary text-sm">${formatTime(message.created_at)}</span>
+                        </div>
+                        ${replyPreview}
+                        <div class="message-text break-words">${message.text}</div>
+                        <div class="flex items-center gap-2 mt-2">
+                            <button onclick="handleReply('${message.id}')" class="text-secondary hover:text-primary text-sm px-2 py-1 rounded hover:bg-tertiary transition-colors">
+                                Reply
+                            </button>
+                            ${isOwn ? `
+                                <button onclick="handleEdit('${message.id}')" class="text-secondary hover:text-primary text-sm px-2 py-1 rounded hover:bg-tertiary transition-colors">
+                                    Edit
+                                </button>
+                                <button onclick="handleDelete('${message.id}')" class="text-secondary hover:text-red-500 text-sm px-2 py-1 rounded hover:bg-tertiary transition-colors">
+                                    Delete
+                                </button>
+                            ` : ''}
+                            <div class="flex items-center gap-1 ml-auto">
+                                <button onclick="handleReaction('${message.id}', 'like')" class="reaction-btn flex items-center gap-1 text-secondary hover:text-green-500 transition-colors">
+                                    👍 <span class="reaction-count">${message.reactions?.like || 0}</span>
+                                </button>
+                                <button onclick="handleReaction('${message.id}', 'dislike')" class="reaction-btn flex items-center gap-1 text-secondary hover:text-red-500 transition-colors">
+                                    👎 <span class="reaction-count">${message.reactions?.dislike || 0}</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `
+
+            return div
+        }
+
+        // Scroll handling
+        const checkScrollPosition = () => {
+            const scrollEl = messagesArea
+            isNearBottom = scrollEl.scrollHeight - scrollEl.scrollTop - scrollEl.clientHeight < 50
+        }
+
+        const scrollToBottom = () => {
+            if (isNearBottom) {
+                messagesArea.scrollTop = messagesArea.scrollHeight
+            }
+        }
+
+        // Render messages
+        const renderMessages = () => {
+            const fragment = document.createDocumentFragment()
+            messages.forEach(msg => {
+                fragment.appendChild(createMessageElement(msg))
+            })
+            messagesArea.innerHTML = ''
+            messagesArea.appendChild(fragment)
+            scrollToBottom()
+        }
+
+        // Username prompt
+        const promptUsername = () => {
+            if (!username) {
+                usernameModal.style.display = 'flex'
+                document.getElementById('username-input').focus()
+            }
+        }
+
+        // Send message
+        const sendMessage = async () => {
+            const text = messageInput.value.trim()
+            if (!text || !username) return
+
+            const tempId = `temp-${Date.now()}`
+            const tempMessage = {
+                id: tempId,
+                username,
+                text,
+                created_at: new Date().toISOString(),
+                reply_to: replyingTo,
+                reactions: { like: 0, dislike: 0 }
+            }
+
+            // Optimistic update
+            messages.push(tempMessage)
+            renderMessages()
+            messageInput.value = ''
+            updateReplyBar(null)
+            updateSendButton()
+
+            try {
+                const { data, error } = await supabase
+                    .from('messages')
+                    .insert([{ username, text, reply_to: replyingTo }])
+                    .select()
+
+                if (error) throw error
+
+                // Replace temp message with real one
+                const index = messages.findIndex(m => m.id === tempId)
+                if (index !== -1 && data[0]) {
+                    messages[index] = data[0]
+                    renderMessages()
+                }
+            } catch (error) {
+                console.error('Send error:', error)
+                // Rollback
+                messages = messages.filter(m => m.id !== tempId)
+                renderMessages()
+                messageInput.value = text
+                showNotification('Failed to send message', 'error')
+            }
+        }
+
+        // Handle reactions
+        const handleReaction = async (messageId, type) => {
+            const message = messages.find(m => m.id === messageId)
+            if (!message) return
+
+            const oldReactions = { ...message.reactions }
+            const newReactions = {
+                ...oldReactions,
+                [type]: (oldReactions[type] || 0) + 1
+            }
+
+            // Optimistic update
+            message.reactions = newReactions
+            renderMessages()
+
+            try {
+                const { error } = await supabase
+                    .from('messages')
+                    .update({ reactions: newReactions })
+                    .eq('id', messageId)
+
+                if (error) throw error
+            } catch (error) {
+                console.error('Reaction error:', error)
+                // Rollback
+                message.reactions = oldReactions
+                renderMessages()
+            }
+        }
+
+        // Handle reply
+        const handleReply = (messageId) => {
+            const message = messages.find(m => m.id === messageId)
+            updateReplyBar(message)
+            messageInput.focus()
+        }
+
+        const updateReplyBar = (message) => {
+            replyingTo = message ? message.id : null
+            if (message) {
+                replyBar.style.display = 'block'
+                replyBar.innerHTML = `
+                    <div class="flex items-center justify-between bg-tertiary rounded-lg px-3 py-2">
+                        <span class="text-sm text-secondary">
+                            Replying to <span class="font-medium">${message.username}</span>: ${message.text.slice(0, 30)}${message.text.length > 30 ? '...' : ''}
+                        </span>
+                        <button onclick="updateReplyBar(null)" class="text-secondary hover:text-primary">✕</button>
+                    </div>
+                `
+            } else {
+                replyBar.style.display = 'none'
+            }
+        }
+
+        // Handle edit
+        const handleEdit = async (messageId) => {
+            const message = messages.find(m => m.id === messageId)
+            if (!message || message.username !== username) return
+
+            const newText = prompt('Edit message:', message.text)
+            if (!newText || newText === message.text) return
+
+            const oldText = message.text
+            message.text = newText
+            renderMessages()
+
+            try {
+                const { error } = await supabase
+                    .from('messages')
+                    .update({ text: newText })
+                    .eq('id', messageId)
+
+                if (error) throw error
+            } catch (error) {
+                console.error('Edit error:', error)
+                message.text = oldText
+                renderMessages()
+                showNotification('Failed to edit message', 'error')
+            }
+        }
+
+        // Handle delete
+        const handleDelete = async (messageId) => {
+            const message = messages.find(m => m.id === messageId)
+            if (!message || message.username !== username) return
+
+            if (!confirm('Delete this message?')) return
+
+            const oldMessages = [...messages]
+            messages = messages.filter(m => m.id !== messageId)
+            renderMessages()
+
+            try {
+                const { error } = await supabase
+                    .from('messages')
+                    .delete()
+                    .eq('id', messageId)
+
+                if (error) throw error
+            } catch (error) {
+                console.error('Delete error:', error)
+                messages = oldMessages
+                renderMessages()
+                showNotification('Failed to delete message', 'error')
+            }
+        }
+
+        // Update send button state
+        const updateSendButton = () => {
+            sendButton.disabled = !messageInput.value.trim() || !username
+        }
+
+        // Show notification
+        const showNotification = (text, type = 'info') => {
+            const notification = document.createElement('div')
+            notification.className = `fixed top-4 right-4 px-4 py-2 rounded-lg text-white z-50 ${
+                type === 'error' ? 'bg-red-500' : 'bg-green-500'
+            }`
+            notification.textContent = text
+            document.body.appendChild(notification)
+            setTimeout(() => notification.remove(), 3000)
+        }
+
+        // Update connection status
+        const updateConnectionStatus = (status) => {
+            connectionStatus = status
+            const indicator = document.getElementById('connection-status')
+            const text = document.getElementById('connection-text')
+            
+            switch(status) {
+                case 'connected':
+                    indicator.className = 'w-2 h-2 bg-green-500 rounded-full'
+                    text.textContent = 'Connected'
+                    break
+                case 'connecting':
+                    indicator.className = 'w-2 h-2 bg-yellow-500 rounded-full animate-pulse'
+                    text.textContent = 'Connecting...'
+                    break
+                case 'disconnected':
+                    indicator.className = 'w-2 h-2 bg-red-500 rounded-full'
+                    text.textContent = 'Disconnected'
+                    break
+            }
+        }
+
+        // Load initial messages
+        const loadMessages = async () => {
+            try {
+                const { data, error } = await supabase
+                    .from('messages')
+                    .select('*')
+                    .order('created_at', { ascending: true })
+
+                if (error) throw error
+                messages = data || []
+                renderMessages()
+            } catch (error) {
+                console.error('Load messages error:', error)
+                showNotification('Failed to load messages', 'error')
+            }
+        }
+
+        // Setup realtime subscription
+        const setupRealtime = () => {
+            const channel = supabase.channel('messages')
+
+            channel
+                .on('postgres_changes', 
+                    { event: 'INSERT', schema: 'public', table: 'messages' },
+                    (payload) => {
+                        if (payload.new.username !== username) {
+                            messages.push(payload.new)
+                            renderMessages()
+                        }
+                    }
+                )
+                .on('postgres_changes',
+                    { event: 'UPDATE', schema: 'public', table: 'messages' },
+                    (payload) => {
+                        const index = messages.findIndex(m => m.id === payload.new.id)
+                        if (index !== -1) {
+                            messages[index] = payload.new
+                            renderMessages()
+                        }
+                    }
+                )
+                .on('postgres_changes',
+                    { event: 'DELETE', schema: 'public', table: 'messages' },
+                    (payload) => {
+                        messages = messages.filter(m => m.id !== payload.old.id)
+                        renderMessages()
+                    }
+                )
+                .subscribe((status) => {
+                    if (status === 'SUBSCRIBED') {
+                        updateConnectionStatus('connected')
+                    } else if (status === 'CHANNEL_ERROR') {
+                        updateConnectionStatus('disconnected')
+                    }
+                })
+
+            // Handle connection state changes
+            supabase.realtime.onOpen(() => updateConnectionStatus('connected'))
+            supabase.realtime.onClose(() => updateConnectionStatus('disconnected'))
+        }
+
+        // Event listeners
+        themeToggle.addEventListener('click', () => {
+            currentTheme = currentTheme === 'light' ? 'dark' : 'light'
+            document.documentElement.setAttribute('data-theme', currentTheme)
+            localStorage.setItem('theme', currentTheme)
+            
+            const icon = themeToggle.querySelector('span')
+            icon.textContent = currentTheme === 'light' ? '🌙' : '☀️'
+        })
+
+        messageInput.addEventListener('input', updateSendButton)
+        messageInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault()
+                sendMessage()
+            }
+        })
+
+        sendButton.addEventListener('click', sendMessage)
+        messagesArea.addEventListener('scroll', checkScrollPosition)
+
+        // Username modal handlers
+        document.getElementById('username-form').addEventListener('submit', (e) => {
+            e.preventDefault()
+            const input = document.getElementById('username-input')
+            const value = input.value.trim()
+            if (value) {
+                username = value
+                localStorage.setItem('chat-username', username)
+                usernameModal.style.display = 'none'
+                updateSendButton()
+                showNotification(`Welcome, ${username}!`, 'success')
+            }
+        })
+
+        // Initialize app
+        const init = async () => {
+            updateConnectionStatus('connecting')
+            await loadMessages()
+            setupRealtime()
+            promptUsername()
+            updateSendButton()
+            
+            // Set initial theme icon
+            const icon = themeToggle.querySelector('span')
+            icon.textContent = currentTheme === 'light' ? '🌙' : '☀️'
+        }
+
+        // Start the app
+        init()
+    </script>
+</head>
+<body class="min-h-screen flex flex-col">
+    <!-- Username Modal -->
+    <div id="username-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-secondary rounded-lg p-6 max-w-md w-full mx-4">
+            <h2 class="text-xl font-bold mb-4">Welcome to Chat!</h2>
+            <p class="text-secondary mb-4">Please enter your username to continue:</p>
+            <form id="username-form">
+                <input 
+                    id="username-input"
+                    type="text" 
+                    class="w-full px-3 py-2 border border-custom rounded-lg bg-tertiary focus:outline-none focus:ring-2 focus:ring-accent"
+                    placeholder="Enter your username"
+                    required
+                    maxlength="30"
+                >
+                <button 
+                    type="submit"
+                    class="w-full mt-3 px-4 py-2 bg-accent text-white rounded-lg hover:opacity-90 transition-opacity"
+                >
+                    Start Chatting
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Header -->
+    <header class="bg-secondary border-b border-custom px-4 py-4">
+        <div class="max-w-4xl mx-auto flex items-center justify-between">
+            <div>
+                <h1 class="text-2xl font-bold">Real-time Chat</h1>
+                <p class="text-secondary text-sm">Connect and collaborate instantly</p>
+            </div>
+            <div class="flex items-center gap-4">
+                <div id="connection-indicator" class="connection-indicator flex items-center gap-2 text-sm">
+                    <span id="connection-status" class="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></span>
+                    <span id="connection-text" class="text-secondary">Connecting...</span>
+                </div>
+                <button 
+                    id="theme-toggle"
+                    class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-tertiary hover:bg-opacity-80 transition-colors"
+                    aria-label="Toggle theme"
+                >
+                    <span>🌙</span>
+                    <span class="text-sm">Theme</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Chat Container -->
+    <main class="flex-1 flex items-center justify-center p-4">
+        <div id="chat-container" class="w-full max-w-4xl bg-secondary rounded-xl shadow-lg border border-custom overflow-hidden">
+            <!-- Messages Area -->
+            <div id="messages-area" class="h-96 overflow-y-auto p-4 scroll-smooth">
+                <!-- Messages will be rendered here -->
+            </div>
+
+            <!-- Reply Bar -->
+            <div id="reply-bar" class="hidden px-4 pb-2">
+                <!-- Reply preview will be shown here -->
+            </div>
+
+            <!-- Message Composer -->
+            <div class="border-t border-custom p-4">
+                <div class="flex gap-2">
+                    <textarea 
+                        id="message-input"
+                        class="flex-1 px-3 py-2 border border-custom rounded-lg bg-tertiary resize-none focus:outline-none focus:ring-2 focus:ring-accent"
+                        placeholder="Type your message... (Shift+Enter for new line)"
+                        rows="2"
+                        maxlength="1000"
+                    ></textarea>
+                    <button 
+                        id="send-button"
+                        class="px-6 py-2 bg-accent text-white rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                        disabled
+                    >
+                        Send
+                    </button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-secondary border-t border-custom px-4 py-3 text-center">
+        <p class="text-secondary text-sm">Made with ❤️☕️ using Supabase</p>
+    </footer>
+</body>
+</html>
