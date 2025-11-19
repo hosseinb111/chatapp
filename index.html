@@ -3,869 +3,700 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Free & Complicated Messenger</title>
+    <title>✨ COSMIC CHAT 3000</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;700;900&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+    
     <style>
         :root {
-            --bg-color: #f5f7fa;
-            --card-bg: #ffffff;
-            --text-color: #333333;
-            --text-secondary: #666666;
-            --border-color: #e1e4e8;
-            --primary-color: #4263eb;
-            --primary-hover: #364fc7;
-            --success-color: #51cf66;
-            --danger-color: #ff6b6b;
-            --message-bg: #f1f3f5;
-            --message-own-bg: #e7f5ff;
-            --shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            --shadow-hover: 0 8px 15px rgba(0, 0, 0, 0.15);
-            --transition: all 0.3s ease;
+            /* POP ART LIGHT THEME */
+            --bg-app: #FFDEE9;
+            --bg-gradient: linear-gradient(0deg, #FFDEE9 0%, #B5FFFC 100%);
+            --bg-card: #ffffff;
+            --text-main: #000000;
+            --border-color: #000000;
+            --accent: #FF0080; /* Hot Pink */
+            --secondary: #00E5FF; /* Cyan */
+            --shadow-color: #000000;
+            
+            --bubble-own: #FF0080;
+            --text-own: #ffffff;
+            --bubble-other: #ffffff;
+            --text-other: #000000;
+            
+            --border-thick: 3px;
+            --shadow-offset: 6px;
         }
 
         [data-theme="dark"] {
-            --bg-color: #181818;
-            --card-bg: #252526;
-            --text-color: #eaeaea;
-            --text-secondary: #b8bec8;
-            --border-color: #2d3748;
-            --primary-color: #4c6ef5;
-            --primary-hover: #364fc7;
-            --success-color: #69db7c;
-            --danger-color: #ff8787;
-            --message-bg: #2d3748;
-            --message-own-bg: #292b2c;
-            --shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
-            --shadow-hover: 0 8px 15px rgba(0, 0, 0, 0.4);
+            /* CYBERPUNK DARK THEME */
+            --bg-app: #050505;
+            --bg-gradient: linear-gradient(45deg, #0f0c29, #302b63, #24243e);
+            --bg-card: #121212;
+            --text-main: #00FF41; /* Matrix Green */
+            --border-color: #00FF41;
+            --accent: #D600FF; /* Neon Purple */
+            --secondary: #FFFF00; /* Cyber Yellow */
+            --shadow-color: #D600FF;
+
+            --bubble-own: #D600FF;
+            --text-own: #ffffff;
+            --bubble-other: #1E1E1E;
+            --text-other: #00FF41;
+            
+            --shadow-offset: 4px;
         }
 
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            line-height: 1.6;
-            transition: var(--transition);
-        }
-
-        .container {
-            max-width: 900px;
-            margin: 0 auto;
-            padding: 20px;
-            height: 100vh;
+            background: var(--bg-gradient);
+            color: var(--text-main);
+            font-family: 'Space Mono', monospace;
             display: flex;
             flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
         }
 
+        /* --- HEADER --- */
         header {
+            background: var(--bg-card);
+            border-bottom: var(--border-thick) solid var(--border-color);
+            padding: 1rem 1.5rem;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 20px;
+            box-shadow: 0px 4px 0px var(--shadow-color);
+            z-index: 100;
+            position: relative;
+        }
+        
+        header h1 {
+            font-family: 'Rubik', sans-serif;
+            font-weight: 900;
+            font-style: italic;
+            text-transform: uppercase;
+            letter-spacing: -1px;
+            font-size: 1.5rem;
+            text-shadow: 2px 2px 0px var(--secondary);
+        }
+        
+        header .tagline {
+            font-size: 0.7rem;
+            background: var(--text-main);
+            color: var(--bg-card);
+            padding: 2px 6px;
+            display: inline-block;
+            transform: rotate(-2deg);
+            margin-top: 5px;
         }
 
-        .app-title {
-            display: flex;
-            flex-direction: column;
+        button {
+            font-family: 'Rubik', sans-serif;
+            font-weight: 700;
+            text-transform: uppercase;
+            cursor: pointer;
+            border: var(--border-thick) solid var(--border-color);
+            transition: all 0.1s ease;
+            outline: none;
         }
 
-        .app-title h1 {
-            font-size: 1.8rem;
-            margin-bottom: 5px;
-        }
-
-        .app-title p {
-            color: var(--text-secondary);
-            font-size: 0.9rem;
+        button:active {
+            transform: translate(2px, 2px);
+            box-shadow: 0px 0px 0px transparent !important;
         }
 
         .theme-toggle {
-            background: var(--card-bg);
-            border: 1px solid var(--border-color);
-            border-radius: 20px;
-            padding: 8px 16px;
-            cursor: pointer;
+            background: var(--secondary);
+            color: #000;
+            padding: 0.5rem 1rem;
+            box-shadow: 4px 4px 0px var(--shadow-color);
             display: flex;
             align-items: center;
             gap: 8px;
-            font-size: 0.9rem;
-            color: var(--text-color);
-            transition: var(--transition);
-            box-shadow: var(--shadow);
         }
 
-        .theme-toggle:hover {
-            box-shadow: var(--shadow-hover);
-        }
-
-        .main-card {
-            background: var(--card-bg);
-            border-radius: 16px;
-            box-shadow: var(--shadow);
+        /* --- MAIN LAYOUT --- */
+        main {
             flex: 1;
+            width: 100%;
+            max-width: 1000px;
+            margin: 20px auto;
+            background: var(--bg-card);
+            border: var(--border-thick) solid var(--border-color);
+            box-shadow: var(--shadow-offset) var(--shadow-offset) 0px var(--shadow-color);
             display: flex;
             flex-direction: column;
             overflow: hidden;
-            transition: var(--transition);
+            position: relative;
         }
 
-        .chat-container {
+        @media(max-width: 600px) {
+            main { margin: 10px; height: calc(100% - 20px); box-shadow: none; }
+        }
+
+        /* --- CHAT WINDOW --- */
+        #chat-window {
             flex: 1;
             overflow-y: auto;
             padding: 20px;
             display: flex;
             flex-direction: column;
-            gap: 16px;
+            gap: 4px; 
+            background-image: radial-gradient(var(--border-color) 1px, transparent 1px);
+            background-size: 20px 20px;
+            opacity: 1;
         }
 
-        .message {
+        /* --- DATE SEPARATOR --- */
+        .date-separator {
+            align-self: center;
+            background: var(--text-main);
+            color: var(--bg-card);
+            padding: 4px 12px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            margin: 20px 0;
+            border: 2px solid var(--border-color);
+            box-shadow: 3px 3px 0px var(--secondary);
+            transform: rotate(-1deg);
+        }
+
+        /* --- MESSAGE ROWS --- */
+        .message-row {
             display: flex;
             gap: 12px;
-            animation: fadeIn 0.3s ease-in-out;
-            position: relative;
+            animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            max-width: 90%;
+            align-items: flex-end;
+            margin-bottom: 12px;
         }
 
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-                transform: translateY(10px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
+        /* Grouping */
+        .message-row.grouped {
+            margin-top: -8px;
+            margin-bottom: 12px;
+        }
+        
+        .message-row.grouped .avatar {
+            visibility: hidden;
+            height: 0px;
+            border: none;
+            box-shadow: none;
+        }
+        
+        .message-row.grouped .meta {
+            display: none;
         }
 
-        .message.own {
+        @keyframes popIn {
+            from { opacity: 0; transform: scale(0.8) translateY(20px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+
+        .message-row.own {
+            align-self: flex-end;
             flex-direction: row-reverse;
         }
 
         .avatar {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
+            width: 42px;
+            height: 42px;
+            border: 2px solid var(--border-color);
+            background: #fff;
             display: flex;
             align-items: center;
             justify-content: center;
-            color: white;
-            font-weight: bold;
+            font-weight: 900;
+            font-size: 1rem;
+            color: #000;
+            box-shadow: 3px 3px 0px var(--shadow-color);
             flex-shrink: 0;
+            transform: rotate(-5deg);
+            transition: 0.2s;
         }
+        .own .avatar { transform: rotate(5deg); }
 
-        .message-content {
-            max-width: 70%;
-        }
-
-        .message-header {
+        .msg-content {
             display: flex;
-            align-items: center;
-            gap: 8px;
-            margin-bottom: 4px;
-        }
-
-        .message.own .message-header {
-            justify-content: flex-end;
-        }
-
-        .username {
-            font-weight: 600;
-        }
-
-        .timestamp {
-            color: var(--text-secondary);
-            font-size: 0.75rem;
-        }
-
-        .message-bubble {
-            background: var(--message-bg);
-            padding: 10px 14px;
-            border-radius: 18px;
+            flex-direction: column;
+            gap: 4px;
             position: relative;
+            /* Added min-width to prevent flex collapse if content is weird */
+            min-width: 0; 
+        }
+
+        .meta {
+            font-size: 0.7rem;
+            font-weight: bold;
+            margin-bottom: 2px;
+            text-transform: uppercase;
+        }
+        .own .meta { text-align: right; }
+
+        .bubble {
+            padding: 12px 18px;
+            font-size: 0.95rem;
+            line-height: 1.5;
+            position: relative;
+            border: 2px solid var(--border-color);
+            box-shadow: 4px 4px 0px rgba(0,0,0,0.2);
             word-wrap: break-word;
+            /* Ensure it doesn't collapse to 0 */
+            min-width: 20px; 
         }
 
-        .message.own .message-bubble {
-            background: var(--message-own-bg);
+        .message-row:not(.own) .bubble {
+            background: var(--bubble-other);
+            color: var(--text-other);
+            border-radius: 15px 15px 15px 0px;
         }
 
-        .reply-preview {
-            background: rgba(0, 0, 0, 0.05);
-            border-left: 3px solid var(--primary-color);
-            padding: 8px;
+        .message-row.own .bubble {
+            background: var(--bubble-own);
+            color: var(--text-own);
+            border-radius: 15px 15px 0px 15px;
+            box-shadow: 4px 4px 0px var(--secondary);
+        }
+
+        .msg-reply-preview {
+            background: rgba(0,0,0,0.1);
+            border-left: 4px solid var(--secondary);
+            padding: 6px;
             margin-bottom: 8px;
-            border-radius: 0 8px 8px 0;
-            font-size: 0.85rem;
-            color: var(--text-secondary);
+            font-size: 0.8rem;
+            font-style: italic;
+            cursor: pointer;
         }
+        [data-theme="dark"] .msg-reply-preview { background: rgba(255,255,255,0.1); }
 
-        [data-theme="dark"] .reply-preview {
-            background: rgba(255, 255, 255, 0.05);
-        }
-
-        .message-actions {
+        /* --- ACTIONS --- */
+        .actions {
             display: flex;
-            gap: 8px;
-            margin-top: 8px;
-            opacity: 0;
-            transition: var(--transition);
+            gap: 6px;
+            margin-top: 6px;
+            opacity: 0; 
+            transition: opacity 0.2s;
         }
-
-        .message:hover .message-actions {
-            opacity: 1;
-        }
-
-        .message.own .message-actions {
-            justify-content: flex-end;
-        }
+        .message-row:hover .actions { opacity: 1; }
+        @media (hover: none) { .actions { opacity: 0.5; } }
 
         .action-btn {
-            background: transparent;
-            border: none;
-            color: var(--text-secondary);
-            cursor: pointer;
-            font-size: 0.9rem;
-            padding: 4px 8px;
-            border-radius: 4px;
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            transition: var(--transition);
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            padding: 2px 6px;
+            font-size: 0.7rem;
+            box-shadow: 2px 2px 0px var(--border-color);
+            color: var(--text-main);
         }
-
         .action-btn:hover {
-            background: rgba(0, 0, 0, 0.05);
-            color: var(--text-color);
+            background: var(--secondary);
+            color: #000;
+            transform: translate(-1px, -1px);
+            box-shadow: 3px 3px 0px var(--border-color);
         }
 
-        [data-theme="dark"] .action-btn:hover {
-            background: rgba(255, 255, 255, 0.05);
-        }
-
-        .reaction-btn {
+        /* --- LOADER --- */
+        #loader {
             display: flex;
-            align-items: center;
-            gap: 4px;
+            justify-content: center;
+            padding: 20px;
+            display: none;
+        }
+        .spinner {
+            width: 40px;
+            height: 40px;
+            background: var(--accent);
+            animation: spin 1s infinite ease-in-out;
+            border: 3px solid var(--border-color);
+            box-shadow: 4px 4px 0px var(--shadow-color);
+        }
+        @keyframes spin { 
+            0% { transform: rotate(0deg); } 
+            50% { transform: rotate(180deg) scale(1.2); } 
+            100% { transform: rotate(360deg); } 
         }
 
-        .reaction-count {
-            font-size: 0.8rem;
-        }
-
-        .composer-container {
-            padding: 16px;
-            border-top: 1px solid var(--border-color);
+        /* --- COMPOSER AREA --- */
+        .composer-area {
+            border-top: var(--border-thick) solid var(--border-color);
+            padding: 15px;
+            background: var(--bg-card);
+            position: relative;
+            z-index: 5;
         }
 
         .reply-bar {
-            background: rgba(0, 0, 0, 0.05);
-            padding: 10px;
-            border-radius: 8px;
-            margin-bottom: 10px;
             display: none;
-            align-items: center;
+            background: var(--secondary);
+            color: #000;
+            padding: 8px 12px;
+            margin-bottom: 12px;
+            border: 2px solid var(--border-color);
+            box-shadow: 3px 3px 0px var(--border-color);
+            font-weight: bold;
             justify-content: space-between;
-        }
-
-        [data-theme="dark"] .reply-bar {
-            background: rgba(255, 255, 255, 0.05);
-        }
-
-        .reply-info {
-            font-size: 0.9rem;
-            color: var(--text-secondary);
-        }
-
-        .reply-cancel {
-            background: transparent;
-            border: none;
-            color: var(--danger-color);
-            cursor: pointer;
-            font-size: 0.9rem;
-            padding: 4px 8px;
-            border-radius: 4px;
-            transition: var(--transition);
-        }
-
-        .reply-cancel:hover {
-            background: rgba(255, 107, 107, 0.1);
-        }
-
-        .composer {
-            display: flex;
-            gap: 10px;
-        }
-
-        .message-input {
-            flex: 1;
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            padding: 12px;
-            background: var(--card-bg);
-            color: var(--text-color);
-            resize: none;
-            font-family: inherit;
-            font-size: 1rem;
-            transition: var(--transition);
-        }
-
-        .message-input:focus {
-            outline: none;
-            border-color: var(--primary-color);
-        }
-
-        .send-btn {
-            background: var(--primary-color);
-            color: white;
-            border: none;
-            border-radius: 8px;
-            padding: 0 20px;
-            cursor: pointer;
-            font-weight: 600;
-            transition: var(--transition);
-            display: flex;
             align-items: center;
-            justify-content: center;
+        }
+        .reply-bar.active { display: flex; animation: slideDown 0.2s; }
+        @keyframes slideDown { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
+        .input-group { display: flex; gap: 10px; }
+
+        textarea {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid var(--border-color);
+            background: var(--bg-app);
+            color: var(--text-main);
+            font-family: 'Space Mono', monospace;
+            resize: none;
+            height: 50px;
+            outline: none;
+            transition: 0.2s;
+            box-shadow: inset 3px 3px 0px rgba(0,0,0,0.1);
+        }
+        textarea:focus {
+            background: var(--bg-card);
+            box-shadow: inset 3px 3px 0px var(--secondary);
         }
 
-        .send-btn:hover:not(:disabled) {
-            background: var(--primary-hover);
+        button#send-btn {
+            background: var(--accent);
+            color: #fff;
+            padding: 0 25px;
+            box-shadow: 4px 4px 0px var(--border-color);
+            font-size: 1.2rem;
         }
-
-        .send-btn:disabled {
-            background: var(--text-secondary);
+        button#send-btn:disabled {
+            background: #ccc;
+            box-shadow: none;
+            transform: translate(2px, 2px);
             cursor: not-allowed;
+        }
+        button#send-btn:not(:disabled):hover {
+            background: #ff3399;
+            transform: translate(-2px, -2px);
+            box-shadow: 6px 6px 0px var(--border-color);
         }
 
         footer {
             text-align: center;
-            margin-top: 20px;
-            color: var(--text-secondary);
-            font-size: 0.9rem;
-        }
-
-        .loading {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100%;
-            color: var(--text-secondary);
-        }
-
-        .empty-state {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100%;
-            color: var(--text-secondary);
-            text-align: center;
-            gap: 16px;
-        }
-
-        .empty-icon {
-            font-size: 3rem;
-        }
-
-        @media (max-width: 768px) {
-            .container {
-                padding: 10px;
-                height: 100vh;
-            }
-
-            .app-title h1 {
-                font-size: 1.5rem;
-            }
-
-            .message-content {
-                max-width: 85%;
-            }
-
-            .composer {
-                flex-direction: column;
-            }
-
-            .send-btn {
-                padding: 10px;
-            }
+            padding: 10px;
+            font-family: 'Rubik', sans-serif;
+            font-weight: bold;
+            text-transform: uppercase;
+            font-size: 0.7rem;
+            letter-spacing: 1px;
+            opacity: 0.6;
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <header>
-            <div class="app-title">
-                <h1>Free & Complicated Messenger 😉✌️</h1>
-                <p>Real-time messaging with Supabase</p>
-            </div>
-            <button class="theme-toggle" id="themeToggle">
-                <span class="theme-icon">🌙</span>
-                <span class="theme-text">Dark</span>
-            </button>
-        </header>
 
-        <div class="main-card">
-            <div class="chat-container" id="chatContainer">
-                <div class="empty-state">
-                    <div class="empty-icon">💬</div>
-                    <h3>No messages yet</h3>
-                    <p>Be the first to send a message!</p>
-                </div>
-            </div>
+    <header>
+        <div>
+            <h1>✨ COSMIC CHAT</h1>
+            <div class="tagline">v3000.2 // DATA FIX</div>
+        </div>
+        <button class="theme-toggle" id="theme-btn">
+            <span id="theme-icon" style="font-size:1.2rem">🌗</span>
+        </button>
+    </header>
 
-            <div class="composer-container">
-                <div class="reply-bar" id="replyBar">
-                    <div class="reply-info">Replying to: <span id="replyToUsername"></span></div>
-                    <button class="reply-cancel" id="cancelReply">Cancel</button>
-                </div>
-                <div class="composer">
-                    <textarea 
-                        class="message-input" 
-                        id="messageInput" 
-                        placeholder="Type a message..." 
-                        rows="2"
-                    ></textarea>
-                    <button class="send-btn" id="sendBtn" disabled>Send</button>
-                </div>
+    <main>
+        <div id="loader"><div class="spinner"></div></div>
+        <div id="chat-window"></div>
+
+        <div class="composer-area">
+            <div id="reply-bar" class="reply-bar">
+                <span id="reply-text">REPLYING TO SOMEONE...</span>
+                <span class="close-reply" id="cancel-reply" style="cursor:pointer; font-size:1.2rem;">✕</span>
+            </div>
+            <div class="input-group">
+                <textarea id="msg-input" placeholder="Transmit signal... (Shift+Enter for new line)"></textarea>
+                <button id="send-btn" disabled>➤</button>
             </div>
         </div>
+    </main>
 
-        <footer>
-            made with ❤️☕️
-        </footer>
-    </div>
+    <footer>
+        coded with ❤️ & high voltage ⚡️
+    </footer>
 
-    <script>
-        // Initialize Supabase with your credentials
-        const supabaseUrl = 'https://fzjkpppzwiuozvszbbdl.supabase.co';
-        const supabaseKey = 'sb_publishable_ClRXbub_U_y3zA3E9oFdUg_vyzDiPtN';
-        const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+    <script type="module">
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm'
 
-        // DOM Elements
-        const chatContainer = document.getElementById('chatContainer');
-        const messageInput = document.getElementById('messageInput');
-        const sendBtn = document.getElementById('sendBtn');
-        const themeToggle = document.getElementById('themeToggle');
-        const themeIcon = document.querySelector('.theme-icon');
-        const themeText = document.querySelector('.theme-text');
-        const replyBar = document.getElementById('replyBar');
-        const replyToUsername = document.getElementById('replyToUsername');
-        const cancelReply = document.getElementById('cancelReply');
+        const supabaseUrl = 'https://fzjkpppzwiuozvszbbdl.supabase.co'
+        const supabaseKey = 'sb_publishable_ClRXbub_U_y3zA3E9oFdUg_vyzDiPtN'
+        const supabase = createClient(supabaseUrl, supabaseKey)
 
-        // State
-        let currentUsername = localStorage.getItem('username') || '';
-        let currentTheme = localStorage.getItem('theme') || 'light';
-        let replyingTo = null;
-        let messages = []; // Store all messages for reply functionality
+        const state = {
+            username: localStorage.getItem('chat_username_funky'),
+            replyTo: null,
+            lastDateRendered: null
+        }
 
-        // Initialize
-        document.addEventListener('DOMContentLoaded', () => {
-            applyTheme(currentTheme);
-            getUsername();
-            setupEventListeners();
-            fetchMessages();
-            setupRealtimeSubscription();
+        const els = {
+            chatWindow: document.getElementById('chat-window'),
+            input: document.getElementById('msg-input'),
+            sendBtn: document.getElementById('send-btn'),
+            replyBar: document.getElementById('reply-bar'),
+            replyText: document.getElementById('reply-text'),
+            cancelReply: document.getElementById('cancel-reply'),
+            themeBtn: document.getElementById('theme-btn'),
+            themeIcon: document.getElementById('theme-icon'),
+            loader: document.getElementById('loader')
+        }
+
+        if (!state.username) {
+            const names = ["NeonRider", "CyberPunk", "RetroGlitch", "PixelSurfer", "DataMiner"];
+            const defaultName = names[Math.floor(Math.random() * names.length)];
+            const name = prompt("WHO GOES THERE? (Enter Username)", defaultName) || defaultName;
+            state.username = name.trim().substring(0, 15).toUpperCase();
+            localStorage.setItem('chat_username_funky', state.username);
+        }
+
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+        updateThemeUI(savedTheme);
+
+        els.themeBtn.addEventListener('click', () => {
+            const current = document.documentElement.getAttribute('data-theme');
+            const next = current === 'light' ? 'dark' : 'light';
+            document.documentElement.setAttribute('data-theme', next);
+            localStorage.setItem('theme', next);
+            updateThemeUI(next);
         });
 
-        // Theme Management
-        function applyTheme(theme) {
-            if (theme === 'dark') {
-                document.documentElement.setAttribute('data-theme', 'dark');
-                themeIcon.textContent = '☀️';
-                themeText.textContent = 'Light';
-            } else {
-                document.documentElement.removeAttribute('data-theme');
-                themeIcon.textContent = '🌙';
-                themeText.textContent = 'Dark';
-            }
-            currentTheme = theme;
-            localStorage.setItem('theme', theme);
+        function updateThemeUI(theme) {
+            els.themeIcon.textContent = theme === 'light' ? '🌚' : '🌞';
+            els.themeBtn.animate([ { transform: 'scale(0.9)' }, { transform: 'scale(1.1)' }, { transform: 'scale(1)' } ], { duration: 200 });
         }
 
-        function setupEventListeners() {
-            // Theme toggle
-            themeToggle.addEventListener('click', () => {
-                applyTheme(currentTheme === 'light' ? 'dark' : 'light');
-            });
+        // --- LOGIC ---
 
-            // Message input
-            messageInput.addEventListener('input', () => {
-                sendBtn.disabled = messageInput.value.trim() === '';
-            });
-
-            messageInput.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    sendMessage();
-                }
-            });
-
-            // Send button
-            sendBtn.addEventListener('click', sendMessage);
-
-            // Cancel reply
-            cancelReply.addEventListener('click', () => {
-                replyingTo = null;
-                replyBar.style.display = 'none';
-                messageInput.focus();
-            });
-        }
-
-        // Username Management
-        function getUsername() {
-            if (!currentUsername) {
-                currentUsername = prompt('Please enter your username:');
-                if (!currentUsername) {
-                    currentUsername = 'Anonymous';
-                }
-                localStorage.setItem('username', currentUsername);
-            }
-        }
-
-        // Message Functions
-        async function fetchMessages() {
-            try {
-                const { data, error } = await supabase
-                    .from('messages')
-                    .select('*')
-                    .order('created_at', { ascending: true });
-
-                if (error) {
-                    console.error('Error fetching messages:', error);
-                    return;
-                }
-
-                if (data && data.length > 0) {
-                    messages = data;
-                    renderMessages(data);
-                    scrollToBottom();
-                }
-            } catch (error) {
-                console.error('Error fetching messages:', error);
-            }
-        }
-
-        function renderMessages(messages) {
-            chatContainer.innerHTML = '';
+        async function loadMessages() {
+            els.loader.style.display = 'flex';
+            // Removed .limit(50) so it loads everything
+            const { data, error } = await supabase
+                .from('messages')
+                .select('*')
+                .order('created_at', { ascending: true });
             
-            messages.forEach(message => {
-                const messageEl = createMessageElement(message);
-                chatContainer.appendChild(messageEl);
-            });
+            els.loader.style.display = 'none';
+            if (error) console.error("Supabase Error:", error);
+            else {
+                data.forEach(renderMessage);
+                scrollToBottom();
+            }
         }
 
-        function createMessageElement(message) {
-            const isOwn = message.username === currentUsername;
-            const messageEl = document.createElement('div');
-            messageEl.className = `message ${isOwn ? 'own' : ''}`;
-            messageEl.dataset.id = message.id;
+        loadMessages();
 
-            // Generate avatar color based on username
-            const avatarColor = generateAvatarColor(message.username);
-            const initials = getInitials(message.username);
-
-            // Format timestamp
-            const timestamp = formatTimestamp(message.created_at);
-
-            // Create reply preview if needed
-            let replyPreview = '';
-            if (message.reply_to) {
-                const repliedMessage = messages.find(m => m.id === message.reply_to);
-                if (repliedMessage) {
-                    replyPreview = `
-                        <div class="reply-preview">
-                            <strong>${repliedMessage.username}:</strong> ${truncateText(repliedMessage.text, 50)}
-                        </div>
-                    `;
+        supabase.channel('public:messages')
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, payload => {
+                renderMessage(payload.new);
+                scrollToBottom(true);
+            })
+            .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'messages' }, payload => {
+                const el = document.getElementById(`msg-${payload.old.id}`);
+                if (el) {
+                    el.style.transform = 'scale(0) rotate(20deg)';
+                    el.style.opacity = '0';
+                    setTimeout(() => el.remove(), 400);
                 }
+            })
+            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, payload => {
+                const el = document.getElementById(`msg-${payload.new.id}`);
+                if (el) {
+                    const wasGrouped = el.classList.contains('grouped');
+                    const newRow = createMessageElement(payload.new);
+                    if(wasGrouped) newRow.classList.add('grouped');
+                    el.innerHTML = newRow.innerHTML;
+                }
+            })
+            .subscribe();
+
+        els.sendBtn.addEventListener('click', sendMessage);
+        els.input.addEventListener('input', () => els.sendBtn.disabled = els.input.value.trim() === '');
+        els.input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        async function sendMessage() {
+            const text = els.input.value.trim();
+            if (!text) return;
+
+            const payload = {
+                username: state.username,
+                content: text,
+                reactions: {"🔥": 0, "💀": 0},
+                reply_to: state.replyTo
+            };
+
+            els.input.value = '';
+            els.sendBtn.disabled = true;
+            clearReply();
+            els.input.focus();
+
+            await supabase.from('messages').insert(payload);
+        }
+
+        // --- RENDERING ---
+
+        function createMessageElement(msg) {
+            // Robust checks: Normalize casing for comparison
+            const myUser = (state.username || '').toUpperCase().trim();
+            const msgUser = (msg.username || '').toUpperCase().trim();
+            const isOwn = myUser === msgUser;
+            
+            // Fix for empty bubbles: Check multiple property names and ensure string
+            let rawText = msg.content || msg.message || msg.text || '';
+            
+            // Use dummy text if the DB sends completely empty data (prevents pill collapse)
+            if (!rawText || rawText.trim() === '') {
+               // If it's truly empty, we might want to skip, but let's render something so you know it exists
+               // rawText = "..."; 
             }
 
-            // Parse reactions
-            const reactions = message.reactions || {};
-            const likeCount = reactions['👍'] || 0;
-            const dislikeCount = reactions['👎'] || 0;
+            const div = document.createElement('div');
+            div.id = `msg-${msg.id}`;
+            div.className = `message-row ${isOwn ? 'own' : ''}`;
+            
+            div.setAttribute('data-sender', msgUser);
+            div.setAttribute('data-time', msg.created_at);
+            
+            const initials = (msg.username || '??').slice(0,2);
+            const color = stringToColor(msg.username || 'anon'); 
+            const time = new Date(msg.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
 
-            messageEl.innerHTML = `
-                <div class="avatar" style="background-color: ${avatarColor}">${initials}</div>
-                <div class="message-content">
-                    <div class="message-header">
-                        <span class="username">${message.username}</span>
-                        <span class="timestamp">${timestamp}</span>
-                    </div>
-                    <div class="message-bubble">
-                        ${replyPreview}
-                        <div class="message-text">${escapeHtml(message.text)}</div>
-                    </div>
-                    <div class="message-actions">
-                        <button class="action-btn" onclick="replyToMessage(${message.id}, '${escapeHtml(message.username)}')">
-                            Reply
-                        </button>
-                        ${isOwn ? `
-                            <button class="action-btn" onclick="editMessage(${message.id})">
-                                Edit
-                            </button>
-                            <button class="action-btn" onclick="deleteMessage(${message.id})">
-                                Delete
-                            </button>
-                        ` : ''}
-                        <button class="action-btn reaction-btn" onclick="addReaction(${message.id}, '👍')">
-                            👍 <span class="reaction-count">${likeCount > 0 ? likeCount : ''}</span>
-                        </button>
-                        <button class="action-btn reaction-btn" onclick="addReaction(${message.id}, '👎')">
-                            👎 <span class="reaction-count">${dislikeCount > 0 ? dislikeCount : ''}</span>
-                        </button>
-                    </div>
+            let replyHtml = '';
+            if (msg.reply_to && msg.reply_to.username) {
+                replyHtml = `
+                <div class="msg-reply-preview">
+                    ↳ <strong>${escapeHtml(msg.reply_to.username)}</strong>: ${escapeHtml(msg.reply_to.snippet || '...')}
+                </div>`;
+            }
+
+            const actions = `
+                <div class="actions">
+                    <button class="action-btn" onclick="replyMsg('${msg.id}', '${escapeHtml(msg.username)}', '${escapeHtml(rawText)}')">↩</button>
+                    ${isOwn ? `<button class="action-btn" onclick="editMsg('${msg.id}', '${escapeHtml(rawText)}')">✎</button>` : ''}
+                    ${isOwn ? `<button class="action-btn" onclick="deleteMsg('${msg.id}')">✖</button>` : ''}
+                    <button class="action-btn" onclick="reactMsg('${msg.id}', '🔥')">🔥 ${msg.reactions?.['🔥']||0}</button>
+                    <button class="action-btn" onclick="reactMsg('${msg.id}', '💀')">💀 ${msg.reactions?.['💀']||0}</button>
                 </div>
             `;
 
-            return messageEl;
+            div.innerHTML = `
+                <div class="avatar" style="background-color: ${color}40; border-color: ${color}">${initials}</div>
+                <div class="msg-content">
+                    <div class="meta">${escapeHtml(msg.username)} <span style="opacity:0.5; font-weight:normal">// ${time}</span></div>
+                    <div class="bubble">
+                        ${replyHtml}
+                        ${escapeHtml(rawText).replace(/\n/g, '<br>')}
+                    </div>
+                    ${actions}
+                </div>
+            `;
+            return div;
         }
 
-        async function sendMessage() {
-            const text = messageInput.value.trim();
-            if (!text) return;
+        function renderMessage(msg) {
+            if (document.getElementById(`msg-${msg.id}`)) return;
 
-            try {
-                const { data, error } = await supabase
-                    .from('messages')
-                    .insert([
-                        {
-                            username: currentUsername,
-                            text: text,
-                            reply_to: replyingTo
-                        }
-                    ])
-                    .select();
-
-                if (error) {
-                    console.error('Error sending message:', error);
-                    return;
-                }
-
-                // Clear input and reset reply state
-                messageInput.value = '';
-                sendBtn.disabled = true;
-                if (replyingTo) {
-                    replyingTo = null;
-                    replyBar.style.display = 'none';
-                }
-                messageInput.focus();
-            } catch (error) {
-                console.error('Error sending message:', error);
-            }
-        }
-
-        function replyToMessage(messageId, username) {
-            replyingTo = messageId;
-            replyToUsername.textContent = username;
-            replyBar.style.display = 'flex';
-            messageInput.focus();
-        }
-
-        async function editMessage(messageId) {
-            const messageEl = document.querySelector(`.message[data-id="${messageId}"]`);
-            const textEl = messageEl.querySelector('.message-text');
-            const currentText = textEl.textContent;
-
-            const newText = prompt('Edit your message:', currentText);
-            if (newText === null || newText === currentText) return;
-
-            try {
-                const { error } = await supabase
-                    .from('messages')
-                    .update({ text: newText })
-                    .eq('id', messageId);
-
-                if (error) {
-                    console.error('Error editing message:', error);
-                }
-            } catch (error) {
-                console.error('Error editing message:', error);
-            }
-        }
-
-        async function deleteMessage(messageId) {
-            if (!confirm('Are you sure you want to delete this message?')) return;
-
-            try {
-                const { error } = await supabase
-                    .from('messages')
-                    .delete()
-                    .eq('id', messageId);
-
-                if (error) {
-                    console.error('Error deleting message:', error);
-                }
-            } catch (error) {
-                console.error('Error deleting message:', error);
-            }
-        }
-
-        async function addReaction(messageId, reaction) {
-            try {
-                // First, get the current message to retrieve existing reactions
-                const { data: message, error: fetchError } = await supabase
-                    .from('messages')
-                    .select('reactions')
-                    .eq('id', messageId)
-                    .single();
-
-                if (fetchError) {
-                    console.error('Error fetching message for reaction:', fetchError);
-                    return;
-                }
-
-                // Update reactions
-                const reactions = message.reactions || {};
-                reactions[reaction] = (reactions[reaction] || 0) + 1;
-
-                // Update the message with new reactions
-                const { error } = await supabase
-                    .from('messages')
-                    .update({ reactions })
-                    .eq('id', messageId);
-
-                if (error) {
-                    console.error('Error adding reaction:', error);
-                }
-            } catch (error) {
-                console.error('Error adding reaction:', error);
-            }
-        }
-
-        // Realtime Subscription
-        function setupRealtimeSubscription() {
-            const channel = supabase
-                .channel('messages')
-                .on('postgres_changes', 
-                    { 
-                        event: '*', 
-                        schema: 'public', 
-                        table: 'messages' 
-                    }, 
-                    (payload) => {
-                        handleRealtimeEvent(payload);
-                    }
-                )
-                .subscribe();
-        }
-
-        function handleRealtimeEvent(payload) {
-            const { eventType, new: newRecord, old: oldRecord } = payload;
-
-            switch (eventType) {
-                case 'INSERT':
-                    // Add to messages array
-                    messages.push(newRecord);
-                    addMessageToUI(newRecord);
-                    scrollToBottom();
-                    break;
-                case 'UPDATE':
-                    // Update in messages array
-                    const index = messages.findIndex(m => m.id === newRecord.id);
-                    if (index !== -1) {
-                        messages[index] = newRecord;
-                    }
-                    updateMessageInUI(newRecord);
-                    break;
-                case 'DELETE':
-                    // Remove from messages array
-                    messages = messages.filter(m => m.id !== oldRecord.id);
-                    removeMessageFromUI(oldRecord.id);
-                    break;
-            }
-        }
-
-        function addMessageToUI(message) {
-            // Remove empty state if it exists
-            const emptyState = chatContainer.querySelector('.empty-state');
-            if (emptyState) {
-                emptyState.remove();
-            }
-
-            const messageEl = createMessageElement(message);
-            chatContainer.appendChild(messageEl);
-        }
-
-        function updateMessageInUI(updatedMessage) {
-            const messageEl = document.querySelector(`.message[data-id="${updatedMessage.id}"]`);
-            if (messageEl) {
-                const newMessageEl = createMessageElement(updatedMessage);
-                messageEl.replaceWith(newMessageEl);
-            }
-        }
-
-        function removeMessageFromUI(messageId) {
-            const messageEl = document.querySelector(`.message[data-id="${messageId}"]`);
-            if (messageEl) {
-                messageEl.remove();
-                
-                // Show empty state if no messages left
-                if (chatContainer.children.length === 0) {
-                    chatContainer.innerHTML = `
-                        <div class="empty-state">
-                            <div class="empty-icon">💬</div>
-                            <h3>No messages yet</h3>
-                            <p>Be the first to send a message!</p>
-                        </div>
-                    `;
-                }
-            }
-        }
-
-        // Utility Functions
-        function generateAvatarColor(username) {
-            let hash = 0;
-            for (let i = 0; i < username.length; i++) {
-                hash = username.charCodeAt(i) + ((hash << 5) - hash);
-            }
+            const msgDate = new Date(msg.created_at);
+            const dateStr = msgDate.toLocaleDateString();
             
-            const h = hash % 360;
-            return `hsl(${h}, 70%, 50%)`;
+            if (state.lastDateRendered !== dateStr) {
+                const separator = document.createElement('div');
+                separator.className = 'date-separator';
+                const today = new Date().toLocaleDateString();
+                const yesterday = new Date(Date.now() - 86400000).toLocaleDateString();
+                
+                if (dateStr === today) separator.innerText = "TODAY";
+                else if (dateStr === yesterday) separator.innerText = "YESTERDAY";
+                else separator.innerText = dateStr;
+                
+                els.chatWindow.appendChild(separator);
+                state.lastDateRendered = dateStr;
+            }
+
+            const el = createMessageElement(msg);
+            const lastEl = els.chatWindow.lastElementChild;
+            
+            if (lastEl && lastEl.classList.contains('message-row')) {
+                const lastSender = lastEl.getAttribute('data-sender');
+                const thisSender = (msg.username || '').toUpperCase().trim();
+                
+                if (lastSender === thisSender) {
+                      el.classList.add('grouped');
+                }
+            }
+
+            els.chatWindow.appendChild(el);
         }
 
-        function getInitials(username) {
-            return username
-                .split(' ')
-                .map(name => name.charAt(0).toUpperCase())
-                .join('')
-                .substring(0, 2);
+        window.deleteMsg = async (id) => {
+            if(confirm('NUKE THIS MESSAGE? ☢️')) await supabase.from('messages').delete().eq('id', id);
         }
 
-        function formatTimestamp(timestamp) {
-            const date = new Date(timestamp);
-            return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        window.editMsg = async (id, oldText) => {
+            const newText = prompt("REWRITE HISTORY:", oldText);
+            if (newText && newText.trim() !== "") {
+                await supabase.from('messages').update({ content: newText }).eq('id', id);
+            }
+        }
+
+        window.replyMsg = (id, username, text) => {
+            state.replyTo = { id, username, snippet: text.substring(0, 30) };
+            els.replyText.innerHTML = `REPLYING TO: <span style="color:var(--accent)">${username}</span>`;
+            els.replyBar.classList.add('active');
+            els.input.focus();
+        }
+
+        window.reactMsg = async (id, type) => {
+            const { data } = await supabase.from('messages').select('reactions').eq('id', id).single();
+            if (data) {
+                const current = data.reactions || {"🔥": 0, "💀": 0};
+                current[type] = (current[type] || 0) + 1;
+                await supabase.from('messages').update({ reactions: current }).eq('id', id);
+            }
+        }
+
+        els.cancelReply.addEventListener('click', clearReply);
+        function clearReply() {
+            state.replyTo = null;
+            els.replyBar.classList.remove('active');
+        }
+
+        function stringToColor(str) {
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
+            return `hsl(${hash % 360}, 100%, 40%)`;
         }
 
         function escapeHtml(text) {
-            const map = {
-                '&': '&amp;',
-                '<': '&lt;',
-                '>': '&gt;',
-                '"': '&quot;',
-                "'": '&#039;'
-            };
-            return text.replace(/[&<>"']/g, m => map[m]);
+            if (text === null || text === undefined) return '';
+            return String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
         }
 
-        function truncateText(text, maxLength) {
-            if (text.length <= maxLength) return text;
-            return text.substring(0, maxLength) + '...';
-        }
+        function scrollToBottom(checkPosition = false) {
+            const t = els.chatWindow;
+            const threshold = 150; 
+            const isNearBottom = t.scrollHeight - t.scrollTop - t.clientHeight <= threshold;
 
-        function scrollToBottom() {
-            chatContainer.scrollTop = chatContainer.scrollHeight;
+            if (!checkPosition || isNearBottom) {
+                t.scrollTop = t.scrollHeight;
+            }
         }
-
-        // Make functions globally accessible for onclick handlers
-        window.replyToMessage = replyToMessage;
-        window.editMessage = editMessage;
-        window.deleteMessage = deleteMessage;
-        window.addReaction = addReaction;
     </script>
 </body>
 </html>
